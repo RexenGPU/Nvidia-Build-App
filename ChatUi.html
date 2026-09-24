@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA Build App</title>
+<style>
+:root{
+  --bg:#181818; --bg2:#121212; --card:#232323; --hover:#2a2a2a;
+  --border:#333; --text:#ececec; --dim:#9b9b9b;
+  --green:#76b900; --green-soft:#8fd400;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);
+     height:100vh;display:flex;overflow:hidden}
+::selection{background:rgba(118,185,0,.35)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#333;border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:#444}
+::-webkit-scrollbar-track{background:transparent}
+button{font-family:inherit}
+
+/* ---------------- Sidebar ---------------- */
+#sidebar{width:272px;min-width:272px;background:var(--bg2);display:flex;flex-direction:column;padding:12px 12px 10px;border-right:1px solid #1e1e1e}
+#sb-brand{display:flex;align-items:center;gap:11px;padding:8px 6px 16px}
+#sb-brand img{width:32px;height:32px;border-radius:9px}
+.brand-text{font-size:17px;font-weight:700;letter-spacing:.3px}
+.brand-text b{color:var(--green)}
+.brand-sub{font-size:10.5px;color:var(--dim);margin-top:1px}
+.sb-btn{display:block;width:100%;border:1px solid var(--green);background:#1c1c1c;color:var(--text);
+  border-radius:11px;padding:11px 12px;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s;text-align:center}
+.sb-btn:hover{background:#232323}
+.sb-btn.ghost{border-color:var(--border)}
+#convo-list{flex:1;overflow-y:auto;margin-top:14px;padding:2px 2px 6px 0}
+.convo{padding:10px 11px;border-radius:9px;cursor:pointer;margin-bottom:2px;position:relative}
+.convo:hover{background:var(--hover)}
+.convo.active{background:#2e2e2e}
+.convo.active::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--green)}
+.convo .t{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.convo .d{font-size:10.5px;color:var(--dim);margin-top:3px}
+#sb-footer{margin-top:10px}
+#sb-version{font-size:10.5px;color:#555;text-align:center;margin-top:8px}
+
+/* ---------------- Main ---------------- */
+#main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+#topbar{height:64px;display:flex;align-items:center;gap:14px;padding:0 22px;border-bottom:2px solid var(--green)}
+#topbar img{width:28px;height:28px;border-radius:8px}
+#topbar .brand{font-size:14px;font-weight:700;white-space:nowrap}
+#topbar .brand b{color:var(--green)}
+#topbar .spacer{flex:1}
+.key-btn{background:none;border:1px solid var(--border);color:var(--dim);border-radius:9px;
+  padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}
+.key-btn:hover{color:var(--text);border-color:var(--green)}
+
+/* ---------------- Chat ---------------- */
+#chat{flex:1;overflow-y:auto;overflow-x:hidden}
+#chat-inner{max-width:860px;margin:0 auto;padding:26px 24px 24px;display:flex;flex-direction:column;gap:28px}
+#key-banner{display:none;max-width:860px;margin:12px auto 0;border:1px solid var(--green);background:#1a2110;border-radius:13px;padding:13px 16px;
+  font-size:13.5px;color:#d9eeae;align-items:center;justify-content:space-between;gap:10px}
+#key-banner button{background:var(--green);color:#141f02;border:none;border-radius:9px;padding:8px 14px;font-weight:700;font-size:12.5px;cursor:pointer}
+
+.welcome{text-align:center;margin-top:9vh}
+.welcome img{width:78px;height:78px;border-radius:20px;margin-bottom:20px}
+.welcome h1{font-size:27px;font-weight:700;letter-spacing:.2px}
+.welcome p{color:var(--dim);font-size:14px;margin:12px 0 30px}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:620px;margin:0 auto}
+.chip{border:1px solid var(--border);background:var(--card);border-radius:14px;padding:15px 16px;
+  font-size:13px;cursor:pointer;transition:.15s;text-align:left;color:var(--text)}
+.chip:hover{border-color:var(--green);background:#262626}
+
+/* messages */
+.msg-user{display:flex;justify-content:flex-end}
+.msg-user .bubble{background:#2f2f2f;border-radius:18px;padding:12px 16px;max-width:72%;
+  white-space:pre-wrap;font-size:15px;line-height:1.55;overflow-wrap:anywhere}
+.msg-ai{display:flex;gap:14px}
+.msg-ai .avatar{width:30px;height:30px;border-radius:9px;flex-shrink:0;margin-top:1px}
+.msg-ai .body{flex:1;min-width:0}
+.ai-head{font-size:12px;font-weight:700;color:#7d922e;margin-bottom:9px;letter-spacing:.3px}
+.ai-head span{color:var(--dim);font-weight:400}
+.actions{display:flex;gap:4px;margin-top:10px;opacity:0;transition:.15s}
+.msg-ai:hover .actions{opacity:1}
+.act{background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer;padding:5px 9px;border-radius:7px;font-weight:600}
+.act:hover{background:#262626;color:var(--text)}
+
+/* markdown */
+.md{font-size:15px;line-height:1.68;overflow-wrap:anywhere}
+.md p{margin:0 0 13px}
+.md>*:last-child{margin-bottom:0}
+.md h3,.md h4,.md h5,.md h6{margin:20px 0 10px;font-weight:700}
+.md h3{font-size:19px}.md h4{font-size:17px}.md h5{font-size:15.5px}.md h6{font-size:14.5px;color:var(--dim)}
+.md ul,.md ol{margin:0 0 13px 22px}
+.md li{margin-bottom:6px}
+.md hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.md blockquote{border-left:3px solid var(--green);padding:2px 0 2px 14px;color:var(--dim);margin:12px 0}
+.md blockquote p{margin:0}
+.md code{background:#2a2a2a;border:1px solid #383838;padding:2px 6px;border-radius:6px;
+  font-family:Consolas,"Cascadia Code",monospace;font-size:13px;color:#d6e2f0}
+.md a{color:var(--green-soft);text-decoration:none;border-bottom:1px dotted rgba(143,212,0,.5);cursor:pointer}
+.md table{border-collapse:collapse;margin:13px 0;display:block;max-width:100%;overflow-x:auto}
+.md th,.md td{border:1px solid var(--border);padding:8px 12px;font-size:13.5px;text-align:left}
+.md th{background:#222;font-weight:700}
+
+/* blocs de code */
+.codeblock{border:1px solid var(--border);border-radius:12px;margin:15px 0;overflow:hidden;background:#0e0e0e}
+.cb-head{display:flex;justify-content:space-between;align-items:center;background:#161616;
+  border-bottom:1px solid var(--border);padding:7px 13px;font-size:11.5px;color:var(--dim);font-weight:700}
+.cb-copy{background:none;border:none;color:var(--dim);font-size:11.5px;cursor:pointer;font-weight:700;padding:2px 4px}
+.cb-copy:hover{color:var(--green)}
+.codeblock pre{padding:13px 15px;overflow-x:auto}
+.codeblock code{font-family:Consolas,"Cascadia Code",monospace;font-size:13.5px;line-height:1.55;color:#d6e2f0;white-space:pre}
+.tok-c{color:#6a9955;font-style:italic}
+.tok-s{color:#ce9178}
+.tok-n{color:#b5cea8}
+.tok-k{color:#569cd6}
+
+/* raisonnement */
+.reasoning{margin:0 0 14px;border:1px solid #2b2b2b;border-radius:11px;background:#1b1b1b}
+.reasoning summary{cursor:pointer;font-size:12px;color:var(--dim);padding:9px 13px;font-weight:700;user-select:none}
+.reasoning summary:hover{color:var(--text)}
+.reasoning .rbody{padding:2px 13px 11px;color:#8d8d8d;font-style:italic;font-size:13.5px;line-height:1.6;white-space:pre-wrap}
+
+/* streaming */
+.cursor{display:inline-block;width:8px;height:16px;background:var(--green);border-radius:2px;
+  vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* erreur */
+.error-card{border:1px solid #5a2a2a;background:#231616;color:#ff7b72;border-radius:13px;
+  padding:14px 16px;font-size:14px;line-height:1.55}
+.error-card b{display:block;margin-bottom:4px;letter-spacing:.3px}
+
+/* ---------------- Input ---------------- */
+#input-zone{padding:4px 24px 12px}
+#model-bar{max-width:860px;margin:0 auto 8px;padding:0 4px;display:flex}
+#model-pill{display:inline-flex;align-items:center;gap:9px;background:#1d1d1d;border:1px solid var(--border);
+  color:var(--text);border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}
+#model-pill:hover{border-color:var(--green);background:#222}
+#model-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+#model-pill .mp-caret{color:var(--dim);font-size:10px}
+#input-card{max-width:860px;margin:0 auto;background:#262626;border:1px solid var(--border);
+  border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:flex-end;transition:border-color .15s}
+#input-card:focus-within{border-color:var(--green)}
+#inp{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:"Segoe UI",inherit;
+  font-size:15px;resize:none;max-height:190px;line-height:1.5;padding:6px 2px}
+#inp::placeholder{color:#666}
+#send-btn{background:var(--green);color:#141f02;border:none;border-radius:12px;padding:10px 18px;
+  font-weight:700;font-size:13.5px;cursor:pointer;min-width:94px;transition:.15s}
+#send-btn:hover{filter:brightness(1.1)}
+#send-btn.stop{background:#3a2222;color:#ff7b72}
+#footer{max-width:860px;margin:7px auto 0;display:flex;justify-content:space-between;
+  font-size:11.5px;color:#5f5f5f;padding:0 4px}
+
+/* meta, edition, recherche, retour bas, aide */
+.meta{font-size:11px;color:#5f5f5f;margin-top:6px}
+.msg-user .actions{display:flex;gap:4px;margin-top:8px;opacity:0;transition:.15s;justify-content:flex-end}
+.msg-user:hover .actions{opacity:1}
+.msg-user.editing{display:block}
+.edit-ta{width:100%;min-height:90px;background:#262626;border:1px solid var(--green);border-radius:14px;color:var(--text);
+  font-family:"Segoe UI",inherit;font-size:15px;padding:12px 14px;outline:none;resize:vertical;line-height:1.5}
+.edit-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.ea-save{background:var(--green);color:#141f02;border:none;border-radius:9px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer}
+.ea-cancel{background:#232323;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:8px 14px;font-weight:600;font-size:12px;cursor:pointer}
+#convo-search{width:100%;background:#1c1c1c;border:1px solid var(--border);border-radius:10px;color:var(--text);
+  padding:9px 12px;font-size:12.5px;outline:none;margin-top:10px;font-family:inherit}
+#convo-search:focus{border-color:var(--green)}
+#convo-search::placeholder{color:#555}
+.convo .pin{float:right;font-size:11px}
+#to-bottom{position:absolute;right:26px;bottom:150px;width:42px;height:42px;border-radius:50%;background:#2c2c2c;
+  border:1px solid var(--border);color:var(--text);font-size:18px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4);
+  display:flex;align-items:center;justify-content:center;z-index:20;transition:.15s}
+#to-bottom:hover{border-color:var(--green)}
+#to-bottom[hidden]{display:none}
+.info-card{border:1px solid #2c3a10;background:#191f0d;color:#cfe6a0;border-radius:13px;padding:16px 18px;font-size:13.5px;line-height:1.9}
+.info-card b{color:var(--green-soft)}
+.info-card .kbd{background:#2a2a2a;border:1px solid #383838;border-radius:6px;padding:1px 7px;
+  font-family:Consolas,monospace;font-size:12px;color:#d6e2f0}
+
+/* menu contextuel */
+.ctx-menu{position:fixed;background:#1f1f1f;border:1px solid var(--border);border-radius:11px;
+  padding:5px;z-index:99;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.ctx-item{padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px}
+.ctx-item:hover{background:#2e2e2e}
+.ctx-item.danger:hover{background:#3a2222;color:#ff7b72}
+.ctx-sep{height:1px;background:var(--border);margin:4px 8px}
+
+/* polish : filtre picker, animations subtiles */
+#picker-filter{width:calc(100% - 20px);margin:0 10px 10px;background:#262626;border:1px solid var(--border);
+  border-radius:9px;color:var(--text);padding:8px 11px;font-size:12.5px;outline:none;font-family:inherit}
+#picker-filter:focus{border-color:var(--green)}
+#streaming .msg-ai{animation:fadeUp .18s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.chip:hover{transform:translateY(-1px)}
+.welcome img{box-shadow:0 0 28px rgba(118,185,0,.22)}
+
+/* overlays (picker + cle) */
+.overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;
+  justify-content:center;z-index:50}
+.overlay[hidden]{display:none}
+#picker-card{width:min(540px,94%);background:#1c1c1c;border:1px solid var(--border);border-radius:16px;
+  padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.picker-title{font-size:13px;font-weight:700;color:var(--dim);padding:6px 10px 12px;letter-spacing:.4px}
+#picker-list{max-height:56vh;overflow-y:auto}
+.picker-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 12px;
+  border-radius:11px;cursor:pointer;border:1px solid transparent}
+.picker-item .n{font-size:13.5px;font-weight:600}
+.picker-item .d{font-size:11.5px;color:var(--dim);margin-top:2px}
+.picker-item.act{background:#2a2a2a}
+.picker-item.sel{border-color:var(--green)}
+.picker-check{color:var(--green);font-weight:700;font-size:15px}
+.picker-hint{font-size:11px;color:#555;text-align:center;padding:10px 0 4px}
+
+#settings-card{width:min(560px,94%);max-height:88vh;overflow-y:auto;background:#1c1c1c;border:1px solid var(--border);border-radius:18px;
+  padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.settings-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.settings-head img{width:48px;height:48px;border-radius:12px}
+.settings-head h2{font-size:19px}
+.settings-head .sub{font-size:11.5px;color:var(--dim);margin-top:2px}
+.s-section{border:1px solid var(--border);border-radius:13px;padding:14px 15px;margin-bottom:12px}
+.s-title{font-size:12px;font-weight:700;color:var(--dim);letter-spacing:.5px;margin-bottom:11px;text-transform:uppercase}
+.s-badge{background:#1a2110;color:var(--green-soft);border:1px solid #3a4a14;border-radius:999px;padding:1px 8px;font-size:10px;letter-spacing:0;text-transform:none;margin-left:6px}
+.s-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.s-row label{font-size:12.5px;color:var(--dim);min-width:90px}
+.s-row input[type=range]{flex:1;accent-color:var(--green)}
+.s-row input[type=number]{background:#262626;border:1px solid var(--border);border-radius:9px;color:var(--text);padding:7px 10px;font-size:13px;outline:none;width:110px}
+.s-col{display:flex;flex-direction:column;gap:6px}
+.s-col label{font-size:12.5px;color:var(--dim)}
+.s-col textarea{background:#262626;border:1px solid var(--border);border-radius:11px;color:var(--text);
+  font-size:13px;padding:10px 12px;outline:none;resize:vertical;font-family:"Segoe UI",inherit;line-height:1.5;min-height:70px}
+.s-col textarea:focus, .s-row input[type=number]:focus{border-color:var(--green)}
+.s-hint{font-size:11.5px;color:var(--dim);margin-top:9px}
+.mono{font-family:Consolas,monospace}
+.mcp-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:11px;margin-bottom:7px}
+.mcp-item .dot{width:9px;height:9px;border-radius:50%;background:#555;flex-shrink:0}
+.mcp-item.ok .dot{background:var(--green)}
+.mcp-item.ko .dot{background:#ff7b72}
+.mcp-item .m-info{flex:1;min-width:0}
+.mcp-item .m-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcp-item .m-status{font-size:11px;color:var(--dim);margin-top:1px}
+.mcp-item .m-status.err{color:#ff7b72}
+.mcp-item .m-off{opacity:.5}
+.mcp-btn{background:none;border:1px solid var(--border);color:var(--dim);border-radius:8px;padding:5px 9px;
+  font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0}
+.mcp-btn:hover{color:var(--text);border-color:#555}
+.mcp-btn.del:hover{border-color:#5a2a2a;color:#ff7b72}
+.mcp-add{border-top:1px dashed var(--border);padding-top:11px;display:flex;flex-direction:column;gap:8px}
+.mcp-add input, .mcp-add select{background:#262626;border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:8px 11px;font-size:12px;outline:none;font-family:inherit;width:100%}
+.mcp-add input:focus{border-color:var(--green)}
+.s-add{background:#1a2110;color:var(--green-soft);border:1px solid #3a4a14;border-radius:9px;padding:9px;font-weight:700;font-size:12.5px;cursor:pointer}
+.s-add:hover{background:#22301a}
+.s-danger #wipe-btn{background:#231616;border:1px solid #5a2a2a;color:#ff7b72;border-radius:9px;padding:9px 14px;font-weight:600;font-size:12.5px;cursor:pointer;width:100%}
+.s-danger #wipe-btn:hover{background:#2a1a1a}
+.s-danger #wipe-btn.confirm{background:#3a2222;font-weight:800}
+
+/* choix de langue au premier lancement */
+#lang-card{width:min(440px,94%);background:#1c1c1c;border:1px solid var(--border);border-radius:20px;
+  padding:30px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#lang-card img{width:58px;height:58px;border-radius:15px;margin-bottom:12px;box-shadow:0 0 24px rgba(118,185,0,.25)}
+#lang-card h2{font-size:18px;margin-bottom:20px}
+#lang-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lang-opt{border:1px solid var(--border);background:#232323;color:var(--text);border-radius:12px;
+  padding:14px;font-size:14.5px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
+.lang-opt:hover{border-color:var(--green);background:#262626;transform:translateY(-1px)}
+.key-row{display:flex;gap:8px;margin-bottom:18px}
+#key-input{flex:1;background:#262626;border:1px solid var(--border);border-radius:11px;color:var(--text);
+  padding:11px 13px;font-size:13px;outline:none;font-family:Consolas,monospace}
+#key-input:focus{border-color:var(--green)}
+#key-eye{background:none;border:1px solid var(--border);border-radius:11px;color:var(--dim);
+  padding:0 13px;cursor:pointer;font-size:12px;font-weight:600}
+#key-eye:hover{color:var(--text)}
+.key-actions{display:flex;gap:10px;justify-content:flex-end}
+#key-cancel{background:#232323;border:1px solid var(--border);color:var(--text);border-radius:11px;
+  padding:10px 16px;font-weight:600;font-size:13px;cursor:pointer}
+#key-cancel:hover{background:#2a2a2a}
+#key-save{background:var(--green);color:#141f02;border:none;border-radius:11px;padding:10px 20px;
+  font-weight:700;font-size:13px;cursor:pointer}
+#key-save:hover{filter:brightness(1.1)}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sb-brand">
+    <img src="{{LOGO}}" alt="logo">
+    <div>
+      <div class="brand-text">NVIDIA <b>BUILD</b></div>
+      <div class="brand-sub">build.nvidia.com · API NIM</div>
+    </div>
+  </div>
+  <button class="sb-btn" id="new-chat">+&nbsp; Nouvelle conversation</button>
+  <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
+  <div id="convo-list"></div>
+  <div id="sb-footer">
+    <div id="sb-version">NVIDIA Build App · v1.7</div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <img src="{{LOGO}}" alt="logo">
+    <div class="brand">NVIDIA <b>BUILD</b></div>
+    <div class="spacer"></div>
+    <button class="key-btn" id="key-btn-top">Paramètres</button>
+  </div>
+
+  <div id="key-banner">
+    <span id="banner-text">Clé API manquante — gratuite sur build.nvidia.com. Ouvrez les Paramètres pour la configurer.</span>
+    <button id="kb-open">Configurer</button>
+  </div>
+
+  <div id="chat"><div id="chat-inner"></div></div>
+
+  <div id="input-zone">
+    <div id="model-bar">
+      <button id="model-pill" title="Changer de modèle (ou tapez /model)">
+        <span class="dot"></span><span id="mp-name">…</span><span class="mp-caret">&#9662;</span>
+      </button>
+    </div>
+    <div id="input-card">
+      <textarea id="inp" rows="1" placeholder="Envoyez un message… /model pour changer de modèle"></textarea>
+      <button id="send-btn">Envoyer</button>
+    </div>
+    <div id="footer">
+      <span id="status">Prêt</span>
+      <span id="footer-hint">Entrée = envoyer · Maj+Entrée = nouvelle ligne · /model = modèle · /aide = aide · Échap = arrêter/fermer</span>
+    </div>
+  </div>
+
+  <!-- retour en bas -->
+  <button id="to-bottom" hidden>↓</button>
+
+  <!-- choix de langue (premier lancement) -->
+  <div class="overlay" id="lang-modal" hidden>
+    <div id="lang-card">
+      <img src="{{LOGO}}" alt="logo">
+      <h2>Choose your language</h2>
+      <div id="lang-grid">
+        <button class="lang-opt" data-lang="en">English</button>
+        <button class="lang-opt" data-lang="fr">Français</button>
+        <button class="lang-opt" data-lang="es">Español</button>
+        <button class="lang-opt" data-lang="de">Deutsch</button>
+        <button class="lang-opt" data-lang="it">Italiano</button>
+        <button class="lang-opt" data-lang="pt">Português</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- picker de modèles (façon Claude Code) -->
+  <div class="overlay" id="picker" hidden>
+    <div id="picker-card">
+      <div class="picker-title" id="picker-title">Choisir le modèle</div>
+      <input id="picker-filter" type="text" placeholder="Filtrer…">
+      <div id="picker-list"></div>
+      <div class="picker-hint" id="picker-hint">↑ ↓ naviguer · Entrée choisir · Échap fermer</div>
+    </div>
+  </div>
+
+  <!-- modale Paramètres (langue, clé API, génération, prompt, MCP) -->
+  <div class="overlay" id="key-modal" hidden>
+    <div id="settings-card">
+      <div class="settings-head">
+        <img src="{{LOGO}}" alt="logo">
+        <div>
+          <h2>Paramètres</h2>
+          <p class="sub" id="set-sub">Tout est stocké uniquement sur votre machine.</p>
+        </div>
+      </div>
+
+      <div class="s-section">
+        <div class="s-row" style="margin-bottom:0">
+          <label id="lbl-lang-el">Langue</label>
+          <select id="lang-sel">
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="de">Deutsch</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Português</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="s-section">
+        <div class="s-title" id="sec-key-t">Clé API NVIDIA</div>
+        <div class="key-row">
+          <input type="password" id="key-input" placeholder="nvapi-…" spellcheck="false" autocomplete="off">
+          <button id="key-eye">afficher</button>
+        </div>
+        <p class="s-hint"><span id="kh1">Gratuite sur</span> <a id="key-link">build.nvidia.com</a> <span id="kh2">· commande /cle</span></p>
+      </div>
+
+      <div class="s-section">
+        <div class="s-title" id="sec-gen-t">Génération</div>
+        <div class="s-row">
+          <label id="lbl-temp">Température</label>
+          <input type="range" id="temp-range" min="0" max="200" step="10" value="70">
+          <span id="temp-val" class="mono">0,7</span>
+        </div>
+        <div class="s-row">
+          <label id="lbl-tokens">Tokens max</label>
+          <input type="number" id="maxtok-input" min="256" max="32768" step="256" value="8192" class="mono">
+        </div>
+        <div class="s-col">
+          <label id="lbl-prompt">Prompt système</label>
+          <textarea id="sysprompt-input" rows="3" spellcheck="false"></textarea>
+        </div>
+      </div>
+
+      <div class="s-section">
+        <div class="s-title" id="sec-mcp-t">Serveurs MCP <span class="s-badge" id="mcp-badge">outils pour l'IA</span></div>
+        <div id="mcp-list"></div>
+        <div class="mcp-add">
+          <div class="s-row">
+            <input type="text" id="mcp-name" placeholder="Nom (ex. Fichiers)">
+            <select id="mcp-transport">
+              <option value="stdio" id="mcp-opt-local">Local (commande)</option>
+              <option value="http" id="mcp-opt-remote">Distant (URL /mcp)</option>
+            </select>
+          </div>
+          <input type="text" id="mcp-command" class="mono" placeholder="Commande, ex. npx -y @modelcontextprotocol/server-filesystem D:\Docs">
+          <input type="text" id="mcp-url" class="mono" placeholder="URL, ex. http://localhost:3000/mcp" style="display:none">
+          <button id="mcp-add-btn" class="s-add">+ Ajouter le serveur</button>
+        </div>
+      </div>
+
+      <div class="s-section s-danger">
+        <div class="s-title" id="sec-danger-t">Zone dangereuse</div>
+        <button id="wipe-btn">Effacer toutes les conversations</button>
+      </div>
+
+      <div class="key-actions">
+        <button id="key-cancel">Annuler</button>
+        <button id="key-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* rapporteur global (bloc separe : survit aux erreurs de syntaxe du script principal) */
+window.onerror = function(msg, src, line, col){
+  try {
+    if (window.chrome && chrome.webview)
+      chrome.webview.postMessage({t:'jsError', error: String(msg) + ' (ligne ' + line + ':' + col + ')'});
+  } catch (e) {}
+};
+</script>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const chatEl = $('#chat'), inner = $('#chat-inner'), inp = $('#inp');
+const state = { busy:false, pinned:true, messages:[], models:[], currentModel:'', key:'', conversations:[], settings:{}, mcp:[], reasoningOpen:true, lang:'en' };
+
+function post(t, extra) {
+  const o = Object.assign({t}, extra||{});
+  if (window.chrome && chrome.webview) chrome.webview.postMessage(o);
+}
+
+/* echappement HTML sans entites litterales (construites via charCode) */
+const C_A = String.fromCharCode(38), C_L = String.fromCharCode(60), C_G = String.fromCharCode(62);
+function esc(s){
+  if (!s) return '';
+  let out = '';
+  for (let i = 0; i < s.length; i++){
+    const c = s[i];
+    if (c === C_A) out += C_A + 'amp;';
+    else if (c === C_L) out += C_A + 'lt;';
+    else if (c === C_G) out += C_A + 'gt;';
+    else out += c;
+  }
+  return out;
+}
+
+/* noms lisibles des modeles */
+const MODEL_INFO = {
+  "nvidia/nemotron-3-super-120b-a12b": ["Nemotron 3 Super 120B", "Équilibré · 1M tokens de contexte"],
+  "nvidia/nemotron-3-ultra-550b-a55b": ["Nemotron 3 Ultra 550B", "Le plus puissant de la famille"],
+  "nvidia/nemotron-3.5-lightning-30b-a3b": ["Nemotron 3.5 Lightning 30B", "Ultra rapide"],
+  "deepseek-ai/deepseek-v4.1-flash": ["DeepSeek V4.1 Flash", "MoE 552B · multimodal"],
+  "z-ai/glm-5.3": ["GLM-5.3", "MoE 753B · raisonnement + outils"],
+  "z-ai/glm-5.3-flash": ["GLM-5.3 Flash", "MoE 320B · multimodal rapide"],
+  "moonshotai/kimi-k3": ["Kimi K3", "MoE 2.8T · multimodal"],
+  "moonshotai/kimi-k2.6": ["Kimi K2.6", "Multimodal · raisonnement"],
+  "google/gemma-4-31b-it": ["Gemma 4 31B", "Dense · raisonnement & code"],
+  "mistralai/mistral-nemotron": ["Mistral Nemotron", "Agentique · code · appels d'outils"],
+  "openai/gpt-oss-20b": ["GPT-OSS 20B", "Compact · raisonnement & maths"],
+  "poolside/laguna-xs-2.1": ["Laguna XS 2.1", "MoE 33B · code agentique"],
+  "meta/muse-glimmer-30b": ["Muse Glimmer 30B", "Multimodal · tool calling"],
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": ["Nemotron 3 Nano Omni", "Omni-modal · image/vidéo/parole"]
+};
+function modelName(id){ return (MODEL_INFO[id] || [id.split('/').pop()])[0]; }
+function modelDesc(id){ return (MODEL_INFO[id] || ["",""])[1] || ""; }
+
+/* ===================== i18n ===================== */
+const I18N = {
+fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation…', settings:'Paramètres',
+  welcomeTitle:'Comment puis-je vous aider ?', welcomeSub:'Choisissez un modèle, écrivez votre message, ou commencez avec une suggestion.',
+  chips:['Explique-moi les transformers simplement','Écris une fonction Python qui inverse une chaîne','Donne-moi 5 idées de projets avec l\'IA','Résume le concept de RAG en 5 points'],
+  inputPh:'Envoyez un message… /model pour changer de modèle', send:'Envoyer', stop:'Arrêter',
+  footerHint:'Entrée = envoyer · Maj+Entrée = nouvelle ligne · /model = modèle · /aide = aide · Échap = arrêter/fermer',
+  bannerText:'Clé API manquante — gratuite sur build.nvidia.com. Ouvrez les Paramètres pour la configurer.', bannerBtn:'Configurer',
+  pickerTitle:'Choisir le modèle', pickerHint:'↑ ↓ naviguer · Entrée choisir · Échap fermer', pickerFilterPh:'Filtrer les modèles…',
+  setSub:'Tout est stocké uniquement sur votre machine.',
+  secKey:'Clé API NVIDIA', secGen:'Génération', secMcp:'Serveurs MCP', mcpBadge:'outils pour l\'IA', secDanger:'Zone dangereuse',
+  lblLang:'Langue', lblTemp:'Température', lblTokens:'Tokens max', lblPrompt:'Prompt système',
+  kh1:'Gratuite sur', kh2:'· commande /cle', show:'afficher',
+  mcpNamePh:'Nom (ex. Fichiers)', mcpLocal:'Local (commande)', mcpRemote:'Distant (URL /mcp)',
+  mcpCmdPh:'Commande, ex. npx -y @modelcontextprotocol/server-filesystem D:\\Docs', mcpUrlPh:'URL, ex. http://localhost:3000/mcp',
+  mcpAdd:'+ Ajouter le serveur', mcpAdding:'Ajout en cours…',
+  mcpEmpty:'Aucun serveur MCP. L\'IA utilisera les outils que vous ajoutez ici.',
+  mcpOn:'Activer', mcpOff:'Désactiver', mcpReconnect:'Reconnecter', mcpDelete:'Supprimer',
+  mcpOk:'Connecté · {n} outil(s)', mcpOffS:'Non connecté', mcpErrS:'Erreur', mcpDisabled:'Désactivé',
+  wipe:'Effacer toutes les conversations', wipeConfirm:'Confirmer : tout effacer définitivement ?',
+  save:'Enregistrer', cancel:'Annuler',
+  ctxOpen:'Ouvrir', ctxRename:'Renommer', ctxPin:'Épingler', ctxUnpin:'Détacher', ctxExport:'Exporter (.md)', ctxClear:'Effacer les messages', ctxDelete:'Supprimer', ctxConfirmDel:'Confirmer la suppression ?',
+  actCopy:'Copier', actRegen:'Régénérer', actDelete:'Supprimer', actEdit:'Éditer',
+  editSave:'Enregistrer (régénère)', editCancel:'Annuler',
+  reasoning:'Raisonnement', toolUsed:'Outil(s) utilisé(s) : {n}', toolHead:'OUTIL', toolResult:'Résultat de l\'outil',
+  errTitle:'Erreur', copy:'Copier', copied:'Copié !',
+  statusBusy:'Génération en cours…', statusNoKey:'Clé API requise — ouvrez les Paramètres', statusReady:'Prêt',
+  helpTitle:'Commandes', helpKeys:'Raccourcis',
+  hcModel:'— choisir le modèle', hcKey:'— configurer la clé API', hcExport:'— exporter la conversation (.md)', hcClear:'— effacer les messages de la conversation', hcSet:'— paramètres (clé API, génération, serveurs MCP)', hcHelp:'— cette aide',
+  hkSend:'envoyer', hkNewline:'nouvelle ligne', hkStop:'arrêter / fermer', hkNew:'nouvelle conversation', hkSearch:'rechercher',
+  helpHover:'Survol d\'une réponse : {a} / {b} / {c}. Survol d\'un message : {d}.',
+  helpCtx:'Clic droit sur une conversation : ouvrir, renommer, épingler, exporter, effacer, supprimer.' },
+en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settings:'Settings',
+  welcomeTitle:'How can I help you?', welcomeSub:'Pick a model, type your message, or start with a suggestion.',
+  chips:['Explain transformers to me simply','Write a Python function that reverses a string','Give me 5 AI project ideas','Summarize the RAG concept in 5 points'],
+  inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop',
+  footerHint:'Enter = send · Shift+Enter = new line · /model = pick model · /help = help · Esc = stop/close',
+  bannerText:'Missing API key — free on build.nvidia.com. Open Settings to configure it.', bannerBtn:'Configure',
+  pickerTitle:'Choose a model', pickerHint:'↑ ↓ navigate · Enter select · Esc close', pickerFilterPh:'Filter models…',
+  setSub:'Everything is stored only on your machine.',
+  secKey:'NVIDIA API key', secGen:'Generation', secMcp:'MCP servers', mcpBadge:'tools for the AI', secDanger:'Danger zone',
+  lblLang:'Language', lblTemp:'Temperature', lblTokens:'Max tokens', lblPrompt:'System prompt',
+  kh1:'Free on', kh2:'· command /key', show:'show',
+  mcpNamePh:'Name (e.g. Files)', mcpLocal:'Local (command)', mcpRemote:'Remote (URL /mcp)',
+  mcpCmdPh:'Command, e.g. npx -y @modelcontextprotocol/server-filesystem D:\\Docs', mcpUrlPh:'URL, e.g. http://localhost:3000/mcp',
+  mcpAdd:'+ Add server', mcpAdding:'Adding…',
+  mcpEmpty:'No MCP server yet. The AI will use the tools you add here.',
+  mcpOn:'Enable', mcpOff:'Disable', mcpReconnect:'Reconnect', mcpDelete:'Delete',
+  mcpOk:'Connected · {n} tool(s)', mcpOffS:'Not connected', mcpErrS:'Connection error', mcpDisabled:'Disabled',
+  wipe:'Delete all conversations', wipeConfirm:'Confirm: erase everything permanently?',
+  save:'Save', cancel:'Cancel',
+  ctxOpen:'Open', ctxRename:'Rename', ctxPin:'Pin', ctxUnpin:'Unpin', ctxExport:'Export (.md)', ctxClear:'Clear messages', ctxDelete:'Delete', ctxConfirmDel:'Confirm deletion?',
+  actCopy:'Copy', actRegen:'Regenerate', actDelete:'Delete', actEdit:'Edit',
+  editSave:'Save (regenerates)', editCancel:'Cancel',
+  reasoning:'Reasoning', toolUsed:'Tool call(s): {n}', toolHead:'TOOL', toolResult:'Tool result',
+  errTitle:'Error', copy:'Copy', copied:'Copied!',
+  statusBusy:'Generating…', statusNoKey:'API key required — open Settings', statusReady:'Ready',
+  helpTitle:'Commands', helpKeys:'Shortcuts',
+  hcModel:'— pick the model', hcKey:'— configure the API key', hcExport:'— export the conversation (.md)', hcClear:'— clear the conversation messages', hcSet:'— settings (API key, generation, MCP servers)', hcHelp:'— this help',
+  hkSend:'send', hkNewline:'new line', hkStop:'stop / close', hkNew:'new conversation', hkSearch:'search',
+  helpHover:'Hover a reply: {a} / {b} / {c}. Hover your message: {d}.',
+  helpCtx:'Right-click a conversation: open, rename, pin, export, clear, delete.' },
+es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', settings:'Ajustes',
+  welcomeTitle:'¿En qué puedo ayudarte?', welcomeSub:'Elige un modelo, escribe tu mensaje o empieza con una sugerencia.',
+  chips:['Explícame los transformers de forma simple','Escribe una función Python que invierta una cadena','Dame 5 ideas de proyectos con IA','Resume el concepto de RAG en 5 puntos'],
+  inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener',
+  footerHint:'Intro = enviar · Mayús+Intro = nueva línea · /model = modelo · /help = ayuda · Esc = detener/cerrar',
+  bannerText:'Falta la clave API — gratis en build.nvidia.com. Abre los Ajustes para configurarla.', bannerBtn:'Configurar',
+  pickerTitle:'Elegir modelo', pickerHint:'↑ ↓ navegar · Intro elegir · Esc cerrar', pickerFilterPh:'Filtrar modelos…',
+  setSub:'Todo se guarda solo en tu equipo.',
+  secKey:'Clave API de NVIDIA', secGen:'Generación', secMcp:'Servidores MCP', mcpBadge:'herramientas para la IA', secDanger:'Zona de peligro',
+  lblLang:'Idioma', lblTemp:'Temperatura', lblTokens:'Tokens máximos', lblPrompt:'Prompt del sistema',
+  kh1:'Gratis en', kh2:'· comando /key', show:'mostrar',
+  mcpNamePh:'Nombre (p. ej. Archivos)', mcpLocal:'Local (comando)', mcpRemote:'Remoto (URL /mcp)',
+  mcpCmdPh:'Comando, p. ej. npx -y @modelcontextprotocol/server-filesystem D:\\Docs', mcpUrlPh:'URL, p. ej. http://localhost:3000/mcp',
+  mcpAdd:'+ Añadir servidor', mcpAdding:'Añadiendo…',
+  mcpEmpty:'Aún no hay servidores MCP. La IA usará las herramientas que añadas aquí.',
+  mcpOn:'Activar', mcpOff:'Desactivar', mcpReconnect:'Reconectar', mcpDelete:'Eliminar',
+  mcpOk:'Conectado · {n} herramienta(s)', mcpOffS:'No conectado', mcpErrS:'Error de conexión', mcpDisabled:'Desactivado',
+  wipe:'Eliminar todas las conversaciones', wipeConfirm:'Confirmar: ¿borrar todo definitivamente?',
+  save:'Guardar', cancel:'Cancelar',
+  ctxOpen:'Abrir', ctxRename:'Renombrar', ctxPin:'Fijar', ctxUnpin:'Quitar fijado', ctxExport:'Exportar (.md)', ctxClear:'Vaciar mensajes', ctxDelete:'Eliminar', ctxConfirmDel:'¿Confirmar eliminación?',
+  actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Eliminar', actEdit:'Editar',
+  editSave:'Guardar (regenera)', editCancel:'Cancelar',
+  reasoning:'Razonamiento', toolUsed:'Herramienta(s) usada(s): {n}', toolHead:'HERRAMIENTA', toolResult:'Resultado de la herramienta',
+  errTitle:'Error', copy:'Copiar', copied:'¡Copiado!',
+  statusBusy:'Generando…', statusNoKey:'Clave API necesaria — abre los Ajustes', statusReady:'Listo',
+  helpTitle:'Comandos', helpKeys:'Atajos',
+  hcModel:'— elegir el modelo', hcKey:'— configurar la clave API', hcExport:'— exportar la conversación (.md)', hcClear:'— vaciar los mensajes de la conversación', hcSet:'— ajustes (clave API, generación, servidores MCP)', hcHelp:'— esta ayuda',
+  hkSend:'enviar', hkNewline:'nueva línea', hkStop:'detener / cerrar', hkNew:'nueva conversación', hkSearch:'buscar',
+  helpHover:'Al pasar sobre una respuesta: {a} / {b} / {c}. Sobre tu mensaje: {d}.',
+  helpCtx:'Clic derecho en una conversación: abrir, renombrar, fijar, exportar, vaciar, eliminar.' },
+de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:'Einstellungen',
+  welcomeTitle:'Wie kann ich helfen?', welcomeSub:'Wähle ein Modell, schreibe deine Nachricht oder starte mit einem Vorschlag.',
+  chips:['Erkläre mir Transformer einfach','Schreibe eine Python-Funktion, die einen String umdreht','Gib mir 5 KI-Projektideen','Fasse das Konzept RAG in 5 Punkten zusammen'],
+  inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp',
+  footerHint:'Enter = senden · Umschalt+Enter = neue Zeile · /model = Modell · /help = Hilfe · Esc = stoppen/schließen',
+  bannerText:'API-Schlüssel fehlt — kostenlos auf build.nvidia.com. Öffne die Einstellungen.', bannerBtn:'Konfigurieren',
+  pickerTitle:'Modell wählen', pickerHint:'↑ ↓ navigieren · Enter wählen · Esc schließen', pickerFilterPh:'Modelle filtern…',
+  setSub:'Alles wird nur lokal gespeichert.',
+  secKey:'NVIDIA API-Schlüssel', secGen:'Generierung', secMcp:'MCP-Server', mcpBadge:'Werkzeuge für die KI', secDanger:'Gefahrenzone',
+  lblLang:'Sprache', lblTemp:'Temperatur', lblTokens:'Max. Tokens', lblPrompt:'System-Prompt',
+  kh1:'Kostenlos auf', kh2:'· Befehl /key', show:'anzeigen',
+  mcpNamePh:'Name (z. B. Dateien)', mcpLocal:'Lokal (Befehl)', mcpRemote:'Remote (URL /mcp)',
+  mcpCmdPh:'Befehl, z. B. npx -y @modelcontextprotocol/server-filesystem D:\\Docs', mcpUrlPh:'URL, z. B. http://localhost:3000/mcp',
+  mcpAdd:'+ Server hinzufügen', mcpAdding:'Wird hinzugefügt…',
+  mcpEmpty:'Noch keine MCP-Server. Die KI nutzt die Werkzeuge, die du hier hinzufügst.',
+  mcpOn:'Aktivieren', mcpOff:'Deaktivieren', mcpReconnect:'Neu verbinden', mcpDelete:'Löschen',
+  mcpOk:'Verbunden · {n} Werkzeug(e)', mcpOffS:'Nicht verbunden', mcpErrS:'Verbindungsfehler', mcpDisabled:'Deaktiviert',
+  wipe:'Alle Unterhaltungen löschen', wipeConfirm:'Bestätigen: endgültig alles löschen?',
+  save:'Speichern', cancel:'Abbrechen',
+  ctxOpen:'Öffnen', ctxRename:'Umbenennen', ctxPin:'Anheften', ctxUnpin:'Lösen', ctxExport:'Exportieren (.md)', ctxClear:'Nachrichten leeren', ctxDelete:'Löschen', ctxConfirmDel:'Löschen bestätigen?',
+  actCopy:'Kopieren', actRegen:'Neu generieren', actDelete:'Löschen', actEdit:'Bearbeiten',
+  editSave:'Speichern (generiert neu)', editCancel:'Abbrechen',
+  reasoning:'Denkprozess', toolUsed:'Werkzeug(e) genutzt: {n}', toolHead:'WERKZEUG', toolResult:'Werkzeugergebnis',
+  errTitle:'Fehler', copy:'Kopieren', copied:'Kopiert!',
+  statusBusy:'Wird generiert…', statusNoKey:'API-Schlüssel erforderlich — Einstellungen öffnen', statusReady:'Bereit',
+  helpTitle:'Befehle', helpKeys:'Tastenkürzel',
+  hcModel:'— Modell wählen', hcKey:'— API-Schlüssel einstellen', hcExport:'— Unterhaltung exportieren (.md)', hcClear:'— Nachrichten der Unterhaltung leeren', hcSet:'— Einstellungen (API-Schlüssel, Generierung, MCP-Server)', hcHelp:'— diese Hilfe',
+  hkSend:'senden', hkNewline:'neue Zeile', hkStop:'stoppen / schließen', hkNew:'neue Unterhaltung', hkSearch:'suchen',
+  helpHover:'Über einer Antwort: {a} / {b} / {c}. Über deiner Nachricht: {d}.',
+  helpCtx:'Rechtsklick auf eine Unterhaltung: öffnen, umbenennen, anheften, exportieren, leeren, löschen.' },
+it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', settings:'Impostazioni',
+  welcomeTitle:'Come posso aiutarti?', welcomeSub:'Scegli un modello, scrivi il messaggio o parti da un suggerimento.',
+  chips:['Spiegami i transformer in modo semplice','Scrivi una funzione Python che inverte una stringa','Dammi 5 idee di progetti con l\'IA','Riassumi il concetto di RAG in 5 punti'],
+  inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma',
+  footerHint:'Invio = invia · Maiusc+Invio = nuova riga · /model = modello · /help = aiuto · Esc = ferma/chiudi',
+  bannerText:'Chiave API mancante — gratuita su build.nvidia.com. Apri le Impostazioni.', bannerBtn:'Configura',
+  pickerTitle:'Scegli il modello', pickerHint:'↑ ↓ naviga · Invio scegli · Esc chiudi', pickerFilterPh:'Filtra i modelli…',
+  setSub:'Tutto è salvato solo sul tuo PC.',
+  secKey:'Chiave API NVIDIA', secGen:'Generazione', secMcp:'Server MCP', mcpBadge:'strumenti per l\'IA', secDanger:'Zona pericolosa',
+  lblLang:'Lingua', lblTemp:'Temperatura', lblTokens:'Token massimi', lblPrompt:'Prompt di sistema',
+  kh1:'Gratuita su', kh2:'· comando /key', show:'mostra',
+  mcpNamePh:'Nome (es. File)', mcpLocal:'Locale (comando)', mcpRemote:'Remoto (URL /mcp)',
+  mcpCmdPh:'Comando, es. npx -y @modelcontextprotocol/server-filesystem D:\\Docs', mcpUrlPh:'URL, es. http://localhost:3000/mcp',
+  mcpAdd:'+ Aggiungi server', mcpAdding:'Aggiunta…',
+  mcpEmpty:'Nessun server MCP. L\'IA userà gli strumenti che aggiungi qui.',
+  mcpOn:'Attiva', mcpOff:'Disattiva', mcpReconnect:'Riconnetti', mcpDelete:'Elimina',
+  mcpOk:'Connesso · {n} strumento(i)', mcpOffS:'Non connesso', mcpErrS:'Errore di connessione', mcpDisabled:'Disattivato',
+  wipe:'Elimina tutte le conversazioni', wipeConfirm:'Confermi: cancellare tutto definitivamente?',
+  save:'Salva', cancel:'Annulla',
+  ctxOpen:'Apri', ctxRename:'Rinomina', ctxPin:'Fissa', ctxUnpin:'Sblocca', ctxExport:'Esporta (.md)', ctxClear:'Svuota i messaggi', ctxDelete:'Elimina', ctxConfirmDel:'Confermi l\'eliminazione?',
+  actCopy:'Copia', actRegen:'Rigenera', actDelete:'Elimina', actEdit:'Modifica',
+  editSave:'Salva (rigenera)', editCancel:'Annulla',
+  reasoning:'Ragionamento', toolUsed:'Strumento(i) usato(i): {n}', toolHead:'STRUMENTO', toolResult:'Risultato dello strumento',
+  errTitle:'Errore', copy:'Copia', copied:'Copiato!',
+  statusBusy:'Generazione…', statusNoKey:'Chiave API richiesta — apri le Impostazioni', statusReady:'Pronto',
+  helpTitle:'Comandi', helpKeys:'Scorciatoie',
+  hcModel:'— scegli il modello', hcKey:'— configura la chiave API', hcExport:'— esporta la conversazione (.md)', hcClear:'— svuota i messaggi della conversazione', hcSet:'— impostazioni (chiave API, generazione, server MCP)', hcHelp:'— questo aiuto',
+  hkSend:'invia', hkNewline:'nuova riga', hkStop:'ferma / chiudi', hkNew:'nuova conversazione', hkSearch:'cerca',
+  helpHover:'Passando su una risposta: {a} / {b} / {c}. Sul tuo messaggio: {d}.',
+  helpCtx:'Clic destro su una conversazione: apri, rinomina, fissa, esporta, svuota, elimina.' },
+pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings:'Configurações',
+  welcomeTitle:'Como posso ajudar?', welcomeSub:'Escolha um modelo, escreva sua mensagem ou comece com uma sugestão.',
+  chips:['Explique os transformers de forma simples','Escreva uma função Python que inverta uma string','Dê-me 5 ideias de projetos com IA','Resuma o conceito de RAG em 5 pontos'],
+  inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar',
+  footerHint:'Enter = enviar · Shift+Enter = nova linha · /model = modelo · /help = ajuda · Esc = parar/fechar',
+  bannerText:'Chave de API ausente — gratuita em build.nvidia.com. Abra as Configurações.', bannerBtn:'Configurar',
+  pickerTitle:'Escolher o modelo', pickerHint:'↑ ↓ navegar · Enter escolher · Esc fechar', pickerFilterPh:'Filtrar modelos…',
+  setSub:'Tudo é salvo apenas no seu computador.',
+  secKey:'Chave de API NVIDIA', secGen:'Geração', secMcp:'Servidores MCP', mcpBadge:'ferramentas para a IA', secDanger:'Zona de perigo',
+  lblLang:'Idioma', lblTemp:'Temperatura', lblTokens:'Tokens máximos', lblPrompt:'Prompt do sistema',
+  kh1:'Gratuita em', kh2:'· comando /key', show:'mostrar',
+  mcpNamePh:'Nome (ex. Arquivos)', mcpLocal:'Local (comando)', mcpRemote:'Remoto (URL /mcp)',
+  mcpCmdPh:'Comando, ex. npx -y @modelcontextprotocol/server-filesystem D:\\Docs', mcpUrlPh:'URL, ex. http://localhost:3000/mcp',
+  mcpAdd:'+ Adicionar servidor', mcpAdding:'Adicionando…',
+  mcpEmpty:'Nenhum servidor MCP ainda. A IA usará as ferramentas que você adicionar aqui.',
+  mcpOn:'Ativar', mcpOff:'Desativar', mcpReconnect:'Reconectar', mcpDelete:'Excluir',
+  mcpOk:'Conectado · {n} ferramenta(s)', mcpOffS:'Não conectado', mcpErrS:'Erro de conexão', mcpDisabled:'Desativado',
+  wipe:'Excluir todas as conversas', wipeConfirm:'Confirmar: apagar tudo definitivamente?',
+  save:'Salvar', cancel:'Cancelar',
+  ctxOpen:'Abrir', ctxRename:'Renomear', ctxPin:'Fixar', ctxUnpin:'Desafixar', ctxExport:'Exportar (.md)', ctxClear:'Limpar mensagens', ctxDelete:'Excluir', ctxConfirmDel:'Confirmar exclusão?',
+  actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Excluir', actEdit:'Editar',
+  editSave:'Salvar (regenera)', editCancel:'Cancelar',
+  reasoning:'Raciocínio', toolUsed:'Ferramenta(s) usada(s): {n}', toolHead:'FERRAMENTA', toolResult:'Resultado da ferramenta',
+  errTitle:'Erro', copy:'Copiar', copied:'Copiado!',
+  statusBusy:'Gerando…', statusNoKey:'Chave de API necessária — abra as Configurações', statusReady:'Pronto',
+  helpTitle:'Comandos', helpKeys:'Atalhos',
+  hcModel:'— escolher o modelo', hcKey:'— configurar a chave de API', hcExport:'— exportar a conversa (.md)', hcClear:'— limpar as mensagens da conversa', hcSet:'— configurações (chave de API, geração, servidores MCP)', hcHelp:'— esta ajuda',
+  hkSend:'enviar', hkNewline:'nova linha', hkStop:'parar / fechar', hkNew:'nova conversa', hkSearch:'pesquisar',
+  helpHover:'Ao passar sobre uma resposta: {a} / {b} / {c}. Sobre sua mensagem: {d}.',
+  helpCtx:'Clique direito numa conversa: abrir, renomear, fixar, exportar, limpar, excluir.' }
+};
+
+function t(k){
+  const d = I18N[state.lang] || I18N.en;
+  if (d[k] !== undefined) return d[k];
+  if (I18N.en[k] !== undefined) return I18N.en[k];
+  return k;
+}
+function getSuggestions(){ return t('chips'); }
+function tn(k, n){ return t(k).replace('{n}', String(n)); }
+
+function applyI18n(){
+  const $id = id => document.getElementById(id);
+  $id('new-chat').textContent = t('newChat');
+  $id('convo-search').placeholder = t('searchPh');
+  $id('key-btn-top').textContent = t('settings');
+  $id('banner-text').textContent = t('bannerText');
+  $id('kb-open').textContent = t('bannerBtn');
+  $id('inp').placeholder = t('inputPh');
+  $id('footer-hint').textContent = t('footerHint');
+  $id('picker-title').textContent = t('pickerTitle');
+  $id('picker-hint').textContent = t('pickerHint');
+  $id('picker-filter').placeholder = t('pickerFilterPh');
+  $id('set-sub').textContent = t('setSub');
+  $id('sec-key-t').textContent = t('secKey');
+  $id('sec-gen-t').textContent = t('secGen');
+  $id('sec-mcp-t').childNodes[0].textContent = t('secMcp') + ' ';
+  $id('mcp-badge').textContent = t('mcpBadge');
+  $id('sec-danger-t').textContent = t('secDanger');
+  $id('lbl-lang-el').textContent = t('lblLang');
+  $id('lbl-temp').textContent = t('lblTemp');
+  $id('lbl-tokens').textContent = t('lblTokens');
+  $id('lbl-prompt').textContent = t('lblPrompt');
+  $id('kh1').textContent = t('kh1');
+  $id('kh2').textContent = t('kh2');
+  $id('key-eye').textContent = t('show');
+  $id('mcp-name').placeholder = t('mcpNamePh');
+  $id('mcp-opt-local').textContent = t('mcpLocal');
+  $id('mcp-opt-remote').textContent = t('mcpRemote');
+  $id('mcp-command').placeholder = t('mcpCmdPh');
+  $id('mcp-url').placeholder = t('mcpUrlPh');
+  $id('mcp-add-btn').textContent = t('mcpAdd');
+  $id('wipe-btn').textContent = t('wipe');
+  $id('key-save').textContent = t('save');
+  $id('key-cancel').textContent = t('cancel');
+  const send = $id('send-btn');
+  send.textContent = state.busy ? t('stop') : t('send');
+  const st = $id('status');
+  if (st.textContent) st.textContent = defaultStatus();
+}
+
+/* ===================== markdown ===================== */
+function inline(s){
+  let out = esc(s);
+  const codes = [];
+  out = out.replace(/`([^`]+)`/g,(m,c)=>{codes.push(c);return '\x01'+(codes.length-1)+'\x01';});
+  out = out.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  out = out.replace(/(^|[\s(])\*([^*\n]+)\*/g,'$1<em>$2</em>');
+  out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<a data-href="$2">$1</a>');
+  out = out.replace(/\x01(\d+)\x01/g,(m,i)=>'<code>'+codes[+i]+'</code>');
+  return out;
+}
+
+const KW = /\b(const|let|var|function|return|if|elif|else|for|while|import|from|export|default|class|new|extends|async|await|try|catch|except|finally|throw|raise|typeof|instanceof|of|in|this|self|null|None|undefined|true|false|True|False|def|lambda|yield|with|as|pass|not|and|or|is|del|print|public|private|protected|static|void|int|float|double|bool|string|char|struct|enum|namespace|using|package|interface|implements|match|case|switch|break|continue|do|then|fi|esac|end|func|fn|mut|impl|trait|SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|TABLE|JOIN|GROUP|ORDER|BY|LIMIT|VALUES|SET)\b/g;
+
+function highlight(code, lang){
+  const hash = /^(py|python|sh|bash|shell|yaml|yml|rb|ruby|toml|ini|dockerfile|r)$/i.test(lang||'');
+  const re = new RegExp(
+    '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/(?:[^\\n]*)' + (hash ? '|#[^\\n]*|--[^\\n]*' : '') + ')' +
+    '|(\'(?:\\\\.|[^\'\\\\\\n])*\'|"(?:\\\\.|[^"\\\\\\n])*"|`(?:\\\\.|[^`\\\\])*`)' +
+    '|\\b(\\d+(?:\\.\\d+)?)\\b', 'g');
+  const kwHits = [];
+  KW.lastIndex = 0;
+  let km;
+  while ((km = KW.exec(code)) !== null) kwHits.push([km.index, km.index + km[0].length]);
+  let ki = 0;
+  const isKw = idx => { while (ki < kwHits.length && kwHits[ki][1] <= idx) ki++; return ki < kwHits.length && kwHits[ki][0] === idx; };
+  function seg(from, to){
+    let s = '', i = from;
+    while (i < to){
+      if (isKw(i)) { const h = kwHits[ki]; ki++; s += '<span class="tok-k">' + esc(code.slice(h[0], h[1])) + '</span>'; i = h[1]; }
+      else { let j = i; while (j < to && !isKw(j)) j++; s += esc(code.slice(i, j)); i = j; }
+    }
+    return s;
+  }
+  let out = '', last = 0, m;
+  while ((m = re.exec(code)) !== null){
+    out += seg(last, m.index);
+    const cls = m[1] !== undefined ? 'tok-c' : m[2] !== undefined ? 'tok-s' : 'tok-n';
+    out += '<span class="' + cls + '">' + esc(m[0]) + '</span>';
+    last = re.lastIndex;
+  }
+  out += seg(last, code.length);
+  return out;
+}
+
+function renderCode(bl){
+  const lang = bl.lang || 'code';
+  const attr = encodeURIComponent(bl.code);
+  return '<div class="codeblock"><div class="cb-head"><span>' + esc(lang) + '</span>' +
+    '<button class="cb-copy" data-code="' + attr + '">' + esc(t('copy')) + '</button></div>' +
+    '<pre><code>' + highlight(bl.code, bl.lang) + '</code></pre></div>';
+}
+
+function mdToHtml(src){
+  if (!src) return '';
+  const blocks = [];
+  src = src.replace(/\r\n/g,'\n');
+  src = src.replace(/```([\w+#.-]*)[^\S\n]*\n?([\s\S]*?)(?:```|$)/g, (m, lang, code) => {
+    blocks.push({lang:lang.trim(), code:code.replace(/\n$/,'')});
+    return '\x00CB' + (blocks.length-1) + '\x00';
+  });
+  const lines = src.split('\n');
+  let html = '', i = 0, para = [];
+  const flush = () => { if (para.length){ html += '<p>' + para.map(inline).join('<br>') + '</p>'; para = []; } };
+  while (i < lines.length){
+    const line = lines[i], t = line.trim();
+    let m;
+    if ((m = t.match(/^\x00CB(\d+)\x00$/))){ flush(); html += renderCode(blocks[+m[1]]); i++; continue; }
+    if (!t){ flush(); i++; continue; }
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))){ flush();
+      const lv = Math.min(m[1].length + 2, 6);
+      html += '<h'+lv+'>' + inline(m[2].replace(/#+\s*$/,'')) + '</h'+lv+'>'; i++; continue; }
+    if (/^(---+|\*\*\*+|___+)\s*$/.test(t)){ flush(); html += '<hr>'; i++; continue; }
+    if ((m = line.match(/^>\s?(.*)$/))){ flush();
+      const q = [m[1]]; i++;
+      while (i < lines.length && (m = lines[i].match(/^>\s?(.*)$/))){ q.push(m[1]); i++; }
+      html += '<blockquote><p>' + q.map(inline).join('<br>') + '</p></blockquote>'; continue; }
+    if ((m = line.match(/^[-*+]\s+(.*)$/))){ flush();
+      html += '<ul>';
+      while (i < lines.length && (m = lines[i].match(/^[-*+]\s+(.*)$/))){ html += '<li>' + inline(m[1]) + '</li>'; i++; }
+      html += '</ul>'; continue; }
+    if ((m = line.match(/^\d+[.)]\s+(.*)$/))){ flush();
+      html += '<ol>';
+      while (i < lines.length && (m = lines[i].match(/^\d+[.)]\s+(.*)$/))){ html += '<li>' + inline(m[1]) + '</li>'; i++; }
+      html += '</ol>'; continue; }
+    if (t.includes('|') && i+1 < lines.length && /^[\s|:-]+$/.test(lines[i+1]) && lines[i+1].includes('-')){
+      flush();
+      const row = l => l.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(c => c.trim());
+      const head = row(line); i += 2;
+      const rows = [];
+      while (i < lines.length && lines[i].trim() && lines[i].includes('|')){ rows.push(row(lines[i])); i++; }
+      html += '<table><thead><tr>' + head.map(h => '<th>' + inline(h) + '</th>').join('') + '</tr></thead><tbody>' +
+        rows.map(r => '<tr>' + r.map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+      continue; }
+    para.push(line); i++;
+  }
+  flush();
+  return html;
+}
+
+/* ===================== rendu messages ===================== */
+const SUGGESTIONS0 = null;  // remplace par getSuggestions()
+
+function welcomeHtml(){
+  return '<div class="welcome"><img src="{{LOGO}}">' +
+    '<h1>' + esc(t('welcomeTitle')) + '</h1>' +
+    '<p>' + esc(t('welcomeSub')) + '</p>' +
+    '<div class="chips">' + getSuggestions().map(s => '<div class="chip">' + esc(s) + '</div>').join('') + '</div></div>';
+}
+
+function reasoningHtml(r, open){
+  return '<details class="reasoning"' + (open ? ' open' : '') + '><summary>' + esc(t('reasoning')) + '</summary>' +
+    '<div class="rbody">' + esc(r) + '</div></details>';
+}
+
+function prettyJson(s){
+  try { return JSON.stringify(JSON.parse(s), null, 1); } catch { return s || ''; }
+}
+
+function toolCallsHtml(tc){
+  return '<details class="reasoning" open><summary>' + esc(tn('toolUsed', tc.length)) + '</summary>' +
+    tc.map(t2 => '<b>' + esc(t2.name) + '</b>' + (t2.arguments && t2.arguments !== '{}' ?
+      '\n' + esc(prettyJson(t2.arguments)) : '')).join('\n\n') +
+    '</div></details>';
+}
+
+function toolMessage(o){
+  return '<div class="msg-ai"><img class="avatar" src="{{LOGO}}"><div class="body">' +
+    '<div class="ai-head">' + esc(t('toolHead')) + '&nbsp; <span>' + esc(o.toolName || '') + '</span></div>' +
+    '<details class="reasoning"><summary>' + esc(t('toolResult')) + '</summary>' +
+    '<div class="rbody">' + esc((o.content || '').slice(0, 6000)) + '</div></details>' +
+    '</div></div>';
+}
+
+function aiMessage(o, streaming, openOverride){
+  const open = openOverride !== undefined ? openOverride : (streaming ? state.reasoningOpen : false);
+  const reason = o.reasoning ? reasoningHtml(o.reasoning, open) : '';
+  const tools = (o.toolCalls && o.toolCalls.length) ? toolCallsHtml(o.toolCalls) : '';
+  const head = '<div class="ai-head">NVIDIA BUILD&nbsp; <span>' + esc(modelName(o.model || '')) + '</span></div>';
+  const md = '<div class="md">' + mdToHtml(o.content) + (streaming ? '<span class="cursor"></span>' : '') + '</div>';
+  let actions = '';
+  if (!streaming){
+    actions = '<div class="actions">' +
+      '<button class="act" data-act="copy" data-idx="' + o.index + '">' + esc(t('actCopy')) + '</button>' +
+      '<button class="act" data-act="regen" data-idx="' + o.index + '">' + esc(t('actRegen')) + '</button>' +
+      '<button class="act" data-act="del" data-idx="' + o.index + '">' + esc(t('actDelete')) + '</button></div>';
+  }
+  const meta = (o.time || o.elapsed != null) ? '<div class="meta">' +
+    [o.time || '', o.elapsed != null ? Number(o.elapsed).toFixed(1).replace('.', ',') + ' s' : '']
+      .filter(Boolean).join(' · ') + '</div>' : '';
+  return '<div class="msg-ai"><img class="avatar" src="{{LOGO}}"><div class="body">' +
+    head + reason + tools + md + actions + meta + '</div></div>';
+}
+
+function userMessage(o){
+  return '<div class="msg-user"><div style="max-width:72%">' +
+    '<div class="bubble" data-raw="' + encodeURIComponent(o.content) + '">' + esc(o.content) + '</div>' +
+    '<div class="actions">' +
+    '<button class="act" data-act="copy" data-idx="' + o.index + '">' + esc(t('actCopy')) + '</button>' +
+    '<button class="act" data-act="edit" data-idx="' + o.index + '">' + esc(t('actEdit')) + '</button>' +
+    '<button class="act" data-act="del" data-idx="' + o.index + '">' + esc(t('actDelete')) + '</button></div>' +
+    (o.time ? '<div class="meta">' + esc(o.time) + '</div>' : '') +
+    '</div></div>';
+}
+
+/* edition d'un message utilisateur (régénère la suite) */
+function startEdit(idx){
+  const btn = document.querySelector('.msg-user .act[data-act="edit"][data-idx="' + idx + '"]');
+  if (!btn) return;
+  const msgEl = btn.closest('.msg-user');
+  const raw = decodeURIComponent(msgEl.querySelector('.bubble').dataset.raw || '');
+  msgEl.classList.add('editing');
+  msgEl.innerHTML =
+    '<div class="edit-wrap" style="width:100%">' +
+    '<textarea class="edit-ta">' + esc(raw) + '</textarea>' +
+    '<div class="edit-actions">' +
+    '<button class="ea-cancel">' + esc(t('editCancel')) + '</button>' +
+    '<button class="ea-save" data-idx="' + idx + '">' + esc(t('editSave')) + '</button>' +
+    '</div></div>';
+  const ta = msgEl.querySelector('.edit-ta');
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+
+/* carte d'aide */
+function showHelp(){
+  const d = document.createElement('div');
+  d.className = 'info-card';
+  d.innerHTML = '<b>' + esc(t('helpTitle')) + '</b><br>' +
+    '<span class="kbd">/model</span> ' + esc(t('hcModel')) + '<br>' +
+    '<span class="kbd">/cle</span> ' + esc(t('hcKey')) + '<br>' +
+    '<span class="kbd">/export</span> ' + esc(t('hcExport')) + '<br>' +
+    '<span class="kbd">/parametres</span> ' + esc(t('hcSet')) + '<br>' +
+    '<span class="kbd">/effacer</span> ' + esc(t('hcClear')) + '<br>' +
+    '<span class="kbd">/aide</span> ' + esc(t('hcHelp')) + '<br><br>' +
+    '<b>' + esc(t('helpKeys')) + '</b><br>' +
+    '<span class="kbd">Enter</span> ' + esc(t('hkSend')) + ' · <span class="kbd">Shift+Enter</span> ' + esc(t('hkNewline')) + ' · <span class="kbd">Esc</span> ' + esc(t('hkStop')) + '<br>' +
+    '<span class="kbd">Ctrl+N</span> ' + esc(t('hkNew')) + ' · <span class="kbd">Ctrl+K</span> ' + esc(t('hkSearch')) + '<br><br>' +
+    esc(t('helpHover').replace('{a}', t('actCopy')).replace('{b}', t('actRegen')).replace('{c}', t('actDelete')).replace('{d}', t('actEdit'))) + '<br>' +
+    esc(t('helpCtx'));
+  inner.appendChild(d);
+  if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function rebuildChat(){
+  const msgs = state.messages;
+  if (!msgs.length){
+    inner.innerHTML = welcomeHtml();
+  } else {
+    inner.innerHTML = msgs.map(m =>
+      m.role === 'user' ? userMessage(m)
+      : m.role === 'tool' ? toolMessage(m)
+      : aiMessage(m, false)).join('');
+  }
+  if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+/* ===================== picker de modèles ===================== */
+let pickerIdx = 0;
+function pickerList(){
+  const q = ($('#picker-filter').value || '').trim().toLowerCase();
+  return state.models.filter(m =>
+    !q || m.toLowerCase().includes(q) || modelName(m).toLowerCase().includes(q));
+}
+function openPicker(){
+  if (!state.models.length) return;
+  $('#picker-filter').value = '';
+  renderPicker();
+  pickerIdx = Math.max(0, pickerList().indexOf(state.currentModel));
+  $('#picker').hidden = false;
+  updatePickerAct();
+  setTimeout(() => $('#picker-filter').focus(), 30);
+}
+function closePicker(){ $('#picker').hidden = true; }
+function renderPicker(){
+  const list = pickerList();
+  $('#picker-list').innerHTML = list.map(m =>
+    '<div class="picker-item' + (m === state.currentModel ? ' sel' : '') + '" data-m="' + esc(m) + '">' +
+    '<div><div class="n">' + esc(modelName(m)) + '</div><div class="d">' + esc(modelDesc(m)) + '</div></div>' +
+    (m === state.currentModel ? '<div class="picker-check">✓</div>' : '') + '</div>').join('');
+}
+function updatePickerAct(){
+  const list = pickerList();
+  if (pickerIdx >= list.length) pickerIdx = Math.max(0, list.length - 1);
+  $$('#picker-list .picker-item').forEach((el, i) => el.classList.toggle('act', i === pickerIdx));
+  const act = document.querySelector('#picker-list .picker-item.act');
+  if (act) act.scrollIntoView({block:'nearest'});
+}
+function pick(m){
+  closePicker();
+  if (m && m !== state.currentModel){
+    state.currentModel = m;
+    updatePill();
+    post('model', {name: m});
+  }
+  inp.focus();
+}
+
+function updatePill(){ $('#mp-name').textContent = modelName(state.currentModel || ''); }
+
+/* statut par defaut (retour auto apres messages transitoires) */
+function defaultStatus(){
+  if (state.busy) return t('statusBusy');
+  if (!state.key) return t('statusNoKey');
+  return t('statusReady') + ' · ' + modelName(state.currentModel || '');
+}
+
+/* ===================== modale Paramètres ===================== */
+const $f = id => document.getElementById(id);
+
+function openSettings(){
+  if (state.settings){
+    $f('key-input').value = state.settings.key || '';
+    $f('temp-range').value = Math.round((state.settings.temperature ?? 0.7) * 100);
+    $f('temp-val').textContent = ((state.settings.temperature ?? 0.7)).toFixed(2).replace('.', ',');
+    $f('maxtok-input').value = state.settings.maxTokens || 8192;
+    $f('sysprompt-input').value = state.settings.systemPrompt || '';
+  }
+  $f('lang-sel').value = state.lang;
+  $f('key-modal').hidden = false;
+  setTimeout(() => $f('key-input').focus(), 30);
+}
+function closeKeyModal(){ $f('key-modal').hidden = true; }
+function saveKey(){
+  const k = $f('key-input').value.trim();
+  state.key = k;
+  post('saveSettings', {
+    key: k,
+    temperature: (+$f('temp-range').value) / 100,
+    maxTokens: +$f('maxtok-input').value,
+    systemPrompt: $f('sysprompt-input').value
+  });
+  closeKeyModal();
+}
+
+/* ===================== MCP ===================== */
+function mcpStatusText(m){
+  if (m.error) return m.error;
+  if (!m.enabled) return t('mcpDisabled');
+  if (m.statusKey === 'ok') return tn('mcpOk', m.tools);
+  if (m.statusKey === 'err') return t('mcpErrS');
+  return t('mcpOffS');
+}
+
+function renderMcpList(){
+  const el = $f('mcp-list');
+  if (!state.mcp || !state.mcp.length){
+    el.innerHTML = '<div class="s-hint">' + esc(t('mcpEmpty')) + '</div>';
+    return;
+  }
+  el.innerHTML = state.mcp.map(m =>
+    '<div class="mcp-item ' + (m.error ? 'ko' : (m.enabled && m.statusKey === 'ok' ? 'ok' : '')) + (m.enabled ? '' : ' m-off') + '">' +
+    '<span class="dot"></span>' +
+    '<div class="m-info"><div class="m-name">' + esc(m.name) + '</div>' +
+    '<div class="m-status' + (m.error ? ' err' : '') + '">' + esc(mcpStatusText(m)) + '</div></div>' +
+    '<button class="mcp-btn" data-mcp="toggle" data-id="' + esc(m.id) + '">' + esc(m.enabled ? t('mcpOff') : t('mcpOn')) + '</button>' +
+    '<button class="mcp-btn" data-mcp="reconnect" data-id="' + esc(m.id) + '">' + esc(t('mcpReconnect')) + '</button>' +
+    '<button class="mcp-btn del" data-mcp="remove" data-id="' + esc(m.id) + '">' + esc(t('mcpDelete')) + '</button>' +
+    '</div>').join('');
+}
+
+/* ===================== API exposee au C# ===================== */
+window.api = {
+  setLang(lang){
+    state.lang = I18N[lang] ? lang : 'en';
+    const sel = document.getElementById('lang-sel');
+    if (sel) sel.value = state.lang;
+    applyI18n();
+    renderConvoList();
+    renderMcpList();
+    rebuildChat();
+    updatePill();
+  },
+  setBusy(b){
+    state.busy = b;
+    const btn = $('#send-btn');
+    btn.textContent = b ? t('stop') : t('send');
+    btn.classList.toggle('stop', b);
+  },
+  setStatus(s){
+    $('#status').textContent = s;
+    clearTimeout(state.statusTimer);
+    if (s !== defaultStatus() && s.indexOf(t('statusReady')) !== 0)
+      state.statusTimer = setTimeout(() => { $('#status').textContent = defaultStatus(); }, 4500);
+  },
+  setKey(k){ state.key = k || ''; },
+  setSettings(s){ state.settings = s || {}; },
+  setMcp(rows){ state.mcp = rows || []; renderMcpList(); },
+  openSettings: openSettings,
+  openPicker: openPicker,
+  setModels(models, current){
+    state.models = models || [];
+    state.currentModel = current || (state.models[0] || '');
+    updatePill();
+  },
+  setConversations(list){
+    state.conversations = list || [];
+    renderConvoList();
+  },
+  renderMessages(msgs){
+    state.messages = msgs || [];
+    rebuildChat();
+  },
+  streamStart(model){
+    state.streamModel = model;
+    if (!$('#streaming')){
+      const div = document.createElement('div');
+      div.id = 'streaming';
+      div.innerHTML = aiMessage({content:'', model:model}, true);
+      inner.appendChild(div);
+      if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
+    }
+  },
+  streamUpdate(content, reasoning){
+    const el = $('#streaming');
+    if (!el) return;
+    const cur = el.querySelector('details.reasoning');
+    if (cur) state.reasoningOpen = cur.open;      // respecter le choix utilisateur pendant la generation
+    el.innerHTML = aiMessage({content:content, reasoning:reasoning, model:state.streamModel}, true);
+    if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
+  },
+  streamEnd(content, reasoning, model, index, elapsed){
+    const el = $('#streaming');
+    const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    const o = {content:content, reasoning:reasoning, model:model, index:index, time:now, elapsed:elapsed};
+    const html = aiMessage(o, false, state.reasoningOpen);
+    if (el) el.outerHTML = html;
+    else inner.insertAdjacentHTML('beforeend', html);
+    if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
+  },
+  cancelStream(){ const el = $('#streaming'); if (el) el.remove(); },
+  showError(text){
+    const el = $('#streaming'); if (el) el.remove();
+    const d = document.createElement('div');
+    d.className = 'error-card';
+    d.innerHTML = '<b>Erreur</b>' + esc(text);
+    inner.appendChild(d);
+    if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
+  },
+  setKeyMissing: function(b){ document.getElementById('key-banner').style.display = b ? 'flex' : 'none'; },
+  openLangPicker: function(){ document.getElementById('lang-modal').hidden = false; }
+};
+state.streamModel = '';
+
+/* liste des conversations (avec recherche live) */
+function renderConvoList(){
+  const q = ($('#convo-search').value || '').trim().toLowerCase();
+  const list = state.conversations.filter(c => !q || (c.title || '').toLowerCase().includes(q));
+  $('#convo-list').innerHTML = list.map(c =>
+    '<div class="convo' + (c.active ? ' active' : '') + '" data-id="' + esc(c.id) + '">' +
+    '<div class="t">' + (c.pinned ? '<span class="pin">📌</span> ' : '') + esc(c.title) + '</div>' +
+    '<div class="d">' + esc(c.date) + '</div></div>').join('');
+}
+$('#convo-search').addEventListener('input', renderConvoList);
+
+/* ===================== events ===================== */
+chatEl.addEventListener('scroll', () => {
+  state.pinned = chatEl.scrollTop + chatEl.clientHeight >= chatEl.scrollHeight - 90;
+  $('#to-bottom').hidden = state.pinned;
+});
+$('#to-bottom').addEventListener('click', () => {
+  state.pinned = true;
+  chatEl.scrollTop = chatEl.scrollHeight;
+  $('#to-bottom').hidden = true;
+});
+
+function autoGrow(){ inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 190) + 'px'; }
+inp.addEventListener('input', autoGrow);
+
+inp.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); if (!state.busy) doSend(); }
+  else if (e.key === 'Escape' && state.busy){ e.stopPropagation(); post('stop'); }
+});
+
+function doSend(){
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = ''; autoGrow();
+  const cmd = text.toLowerCase();
+  if (cmd === '/model' || cmd === '/models'){ openPicker(); return; }
+  if (cmd === '/cle' || cmd === '/key' || cmd === '/apikey' || cmd === '/parametres' || cmd === '/reglages' || cmd === '/settings'){ openSettings(); return; }
+  if (cmd === '/export'){ post('export'); return; }
+  if (cmd === '/effacer' || cmd === '/clear'){ post('clearMessages'); return; }
+  if (cmd === '/aide' || cmd === '/help'){ showHelp(); return; }
+  post('send', {text: text});
+}
+
+$('#send-btn').addEventListener('click', () => { state.busy ? post('stop') : doSend(); });
+$('#new-chat').addEventListener('click', () => post('newChat'));
+$('#model-pill').addEventListener('click', openPicker);
+$('#picker-filter').addEventListener('input', () => { renderPicker(); pickerIdx = 0; updatePickerAct(); });
+$('#lang-sel').addEventListener('change', () => {
+  state.lang = $('#lang-sel').value;
+  applyI18n();
+  renderConvoList();
+  renderMcpList();
+  rebuildChat();
+  updatePill();
+  post('setLang', {lang: state.lang});
+});
+
+/* choix de langue au premier lancement */
+$('#lang-grid').addEventListener('click', e => {
+  const b = e.target.closest('.lang-opt');
+  if (!b) return;
+  $('#lang-modal').hidden = true;
+  state.lang = b.dataset.lang;
+  const ls = document.getElementById('lang-sel'); if (ls) ls.value = state.lang;
+  applyI18n();
+  renderConvoList();
+  renderMcpList();
+  rebuildChat();
+  updatePill();
+  post('setLang', {lang: state.lang});
+});
+$('#lang-modal').addEventListener('click', e => { if (e.target === $('#lang-modal')) $('#lang-modal').hidden = true; });
+$('#key-btn-top').addEventListener('click', openSettings);
+$('#kb-open').addEventListener('click', openSettings);
+$('#key-link').addEventListener('click', () => post('openUrl', {url:'https://build.nvidia.com'}));
+$('#key-eye').addEventListener('click', () => {
+  const k = $('#key-input');
+  k.type = k.type === 'password' ? 'text' : 'password';
+});
+$('#key-save').addEventListener('click', saveKey);
+$('#key-cancel').addEventListener('click', closeKeyModal);
+$('#key-input').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveKey(); } });
+
+/* fermeture par clic sur le fond (picker + parametres) */
+$('#picker').addEventListener('click', e => { if (e.target === $('#picker')) closePicker(); });
+$('#key-modal').addEventListener('click', e => { if (e.target === $('#key-modal')) closeKeyModal(); });
+
+/* generation */
+$('#temp-range').addEventListener('input', () => {
+  $('#temp-val').textContent = (+$('#temp-range').value / 100).toFixed(2).replace('.', ',');
+});
+$('#maxtok-input').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveKey(); } });
+
+/* MCP */
+$('#mcp-transport').addEventListener('change', () => {
+  const http = $('#mcp-transport').value === 'http';
+  $('#mcp-command').style.display = http ? 'none' : 'block';
+  $('#mcp-url').style.display = http ? 'block' : 'none';
+});
+$('#mcp-add-btn').addEventListener('click', () => {
+  const transport = $('#mcp-transport').value;
+  const name = $('#mcp-name').value.trim() || (transport === 'http' ? t('mcpRemote') : t('mcpLocal'));
+  const command = $('#mcp-command').value.trim();
+  const url = $('#mcp-url').value.trim();
+  if (transport === 'stdio' && !command) return;
+  if (transport === 'http' && !url) return;
+  post('addMcp', {name: name, transport: transport, command: command, url: url});
+  $('#mcp-name').value = ''; $('#mcp-command').value = ''; $('#mcp-url').value = '';
+  const nb = $('#mcp-add-btn');
+  nb.textContent = t('mcpAdding');
+  setTimeout(() => nb.textContent = t('mcpAdd'), 1500);
+});
+
+/* effacer toutes les conversations (confirmation en 2 temps) */
+let wipeArmed = false, wipeTimer = null;
+$('#wipe-btn').addEventListener('click', () => {
+  const b = $('#wipe-btn');
+  if (!wipeArmed){
+    wipeArmed = true;
+    b.textContent = t('wipeConfirm');
+    b.classList.add('confirm');
+    clearTimeout(wipeTimer);
+    wipeTimer = setTimeout(() => {
+      wipeArmed = false;
+      b.textContent = t('wipe');
+      b.classList.remove('confirm');
+    }, 3000);
+  } else {
+    wipeArmed = false;
+    clearTimeout(wipeTimer);
+    b.textContent = t('wipe');
+    b.classList.remove('confirm');
+    closeKeyModal();
+    post('deleteAllConvos');
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (!$('#picker').hidden){
+    const list = pickerList();
+    if (e.key === 'ArrowDown'){ e.preventDefault(); pickerIdx = (pickerIdx + 1) % Math.max(1, list.length); updatePickerAct(); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); pickerIdx = (pickerIdx - 1 + list.length) % Math.max(1, list.length); updatePickerAct(); }
+    else if (e.key === 'Enter'){ e.preventDefault(); if (list[pickerIdx]) pick(list[pickerIdx]); }
+    else if (e.key === 'Escape'){ e.preventDefault(); closePicker(); inp.focus(); }
+    return;
+  }
+  if (!$('#key-modal').hidden && e.key === 'Escape'){ e.preventDefault(); closeKeyModal(); }
+  if (e.ctrlKey && (e.key === 'n' || e.key === 'N')){ e.preventDefault(); post('newChat'); }
+  else if (e.ctrlKey && (e.key === 'k' || e.key === 'K')){ e.preventDefault(); $('#convo-search').focus(); }
+});
+
+document.addEventListener('click', e => {
+  closeCtx();
+  /* ouverture d'une conversation au simple clic */
+const cv = e.target.closest('.convo');
+if (cv){ if (!state.busy) post('open', {id: cv.dataset.id}); return; }
+const el = e.target.closest('.chip');
+  if (el){ inp.value = el.textContent.trim(); autoGrow(); inp.focus(); return; }
+  const copy = e.target.closest('.cb-copy');
+  if (copy){ post('copy', {text: decodeURIComponent(copy.dataset.code)}); copy.textContent = t('copied'); setTimeout(()=>copy.textContent=t('copy'), 1300); return; }
+  const a = e.target.closest('a[data-href]');
+  if (a){ e.preventDefault(); post('openUrl', {url: a.dataset.href}); return; }
+  const pk = e.target.closest('.picker-item');
+  if (pk){ pick(pk.dataset.m); return; }
+  const mcpBtn = e.target.closest('.mcp-btn');
+  if (mcpBtn){
+    const a = mcpBtn.dataset.mcp;
+    const id = mcpBtn.dataset.id;
+    if (a === 'remove') post('removeMcp', {id: id});
+    else if (a === 'toggle') post('toggleMcp', {id: id});
+    else if (a === 'reconnect') post('reconnectMcp', {id: id});
+    return;
+  }
+  const eaCancel = e.target.closest('.ea-cancel');
+  if (eaCancel){ rebuildChat(); return; }
+  const eaSave = e.target.closest('.ea-save');
+  if (eaSave){
+    const ta = eaSave.closest('.edit-wrap').querySelector('.edit-ta');
+    const text = ta.value.trim();
+    if (text) post('editMsg', {index: +eaSave.dataset.idx, text: text});
+    return;
+  }
+  const act = e.target.closest('.act');
+  if (act){
+    const idx = +act.dataset.idx;
+    if (act.dataset.act === 'copy'){ post('copyMsg', {index: idx}); }
+    else if (act.dataset.act === 'regen'){ post('regenerate', {index: idx}); }
+    else if (act.dataset.act === 'del'){ post('deleteMsg', {index: idx}); }
+    else if (act.dataset.act === 'edit'){ startEdit(idx); }
+  }
+});
+
+/* menu contextuel conversations */
+let ctxEl = null;
+function closeCtx(){ if (ctxEl){ ctxEl.remove(); ctxEl = null; } }
+$('#convo-list').addEventListener('contextmenu', e => {
+  const item = e.target.closest('.convo');
+  if (!item) return;
+  e.preventDefault();
+  closeCtx();
+  ctxEl = document.createElement('div');
+  ctxEl.className = 'ctx-menu';
+  ctxEl.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+  ctxEl.style.top = Math.min(e.clientY, window.innerHeight - 140) + 'px';
+  const id = item.dataset.id;
+  const convo = state.conversations.find(c => c.id === id);
+  ctxEl.innerHTML =
+    '<div class="ctx-item" data-a="open">' + esc(t('ctxOpen')) + '</div>' +
+    '<div class="ctx-item" data-a="rename">' + esc(t('ctxRename')) + '</div>' +
+    '<div class="ctx-item" data-a="pin">' + esc(convo && convo.pinned ? t('ctxUnpin') : t('ctxPin')) + '</div>' +
+    '<div class="ctx-sep"></div>' +
+    '<div class="ctx-item" data-a="export">' + esc(t('ctxExport')) + '</div>' +
+    '<div class="ctx-item" data-a="clear">' + esc(t('ctxClear')) + '</div>' +
+    '<div class="ctx-sep"></div>' +
+    '<div class="ctx-item danger" data-a="delete">' + esc(t('ctxDelete')) + '</div>';
+  let confirmed = false;
+  ctxEl.addEventListener('click', ev => {
+    const a = ev.target.closest('.ctx-item'); if (!a) return;
+    if (a.dataset.a === 'delete' && !confirmed){
+      ev.stopPropagation();          // empecher le handler document de fermer le menu (confirmation en 2 temps)
+      confirmed = true;
+      a.textContent = t('ctxConfirmDel');
+      setTimeout(() => { confirmed = false; if (a.isConnected) a.textContent = t('ctxDelete'); }, 2500);
+      return;
+    }
+    closeCtx();
+    if (a.dataset.a === 'open') post('open', {id});
+    else if (a.dataset.a === 'rename') post('rename', {id});
+    else if (a.dataset.a === 'pin') post('pin', {id});
+    else if (a.dataset.a === 'export') post('export', {id});
+    else if (a.dataset.a === 'clear') post('clearMessages', {id});
+    else if (a.dataset.a === 'delete') post('delete', {id});
+  });
+  document.body.appendChild(ctxEl);
+});
+
+/* recherche : Entree ouvre le premier resultat, Echap vide */
+$('#convo-search').addEventListener('keydown', e => {
+  if (e.key === 'Escape'){
+    e.preventDefault();
+    if ($('#convo-search').value){ $('#convo-search').value = ''; renderConvoList(); }
+    else $('#convo-search').blur();
+  } else if (e.key === 'Enter'){
+    e.preventDefault();
+    const first = document.querySelector('#convo-list .convo');
+    if (first) post('open', {id: first.dataset.id});
+  }
+});
+
+applyI18n();
+window.addEventListener('load', () => { autoGrow(); const ls = document.getElementById('lang-sel'); if (ls) ls.value = state.lang; post('ready'); });
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
