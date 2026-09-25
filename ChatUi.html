@@ -176,6 +176,22 @@ button{font-family:inherit}
 .info-card .kbd{background:#2a2a2a;border:1px solid #383838;border-radius:6px;padding:1px 7px;
   font-family:Consolas,monospace;font-size:12px;color:#d6e2f0}
 
+/* pieces jointes images */
+#att-bar{max-width:860px;margin:0 auto 8px;display:flex;gap:10px;flex-wrap:wrap;padding:0 4px}
+#att-bar[hidden]{display:none}
+.att-item{position:relative;width:56px;height:56px}
+.att-item img{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid #3a3a3a}
+.att-x{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;background:#333;color:#fff;
+  border:none;cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+.att-x:hover{background:#ff7b72}
+#att-btn{background:#1d1d1d;border:1px solid var(--border);color:var(--dim);border-radius:13px;width:46px;height:46px;
+  font-size:21px;cursor:pointer;flex-shrink:0;transition:.15s;line-height:1}
+#att-btn:hover{border-color:var(--green);color:var(--text)}
+.atts{display:flex;gap:6px;justify-content:flex-end;margin-bottom:7px;flex-wrap:wrap}
+.att-thumb{width:74px;height:74px;object-fit:cover;border-radius:10px;border:1px solid #3a3a3a}
+.vis-b{font-size:9px;font-weight:800;color:var(--green-soft);border:1px solid #3a4a14;border-radius:5px;
+  padding:1px 5px;letter-spacing:.5px;vertical-align:middle;margin-left:6px}
+
 /* menu contextuel */
 .ctx-menu{position:fixed;background:#1f1f1f;border:1px solid var(--border);border-radius:11px;
   padding:5px;z-index:99;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -292,7 +308,7 @@ button{font-family:inherit}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v2.0</div>
+    <div id="sb-version">NVIDIA Build App · v2.1</div>
   </div>
 </div>
 
@@ -317,7 +333,9 @@ button{font-family:inherit}
         <span class="dot"></span><span id="mp-name">…</span><span class="mp-caret">&#9662;</span>
       </button>
     </div>
+    <div id="att-bar" hidden></div>
     <div id="input-card">
+      <button id="att-btn" title="Joindre une image">+</button>
       <textarea id="inp" rows="1" placeholder="Envoyez un message… /model pour changer de modèle"></textarea>
       <button id="send-btn">Envoyer</button>
     </div>
@@ -326,6 +344,7 @@ button{font-family:inherit}
       <span id="footer-hint">Entrée = envoyer · Maj+Entrée = nouvelle ligne · /model = modèle · /aide = aide · Échap = arrêter/fermer</span>
     </div>
   </div>
+  <input type="file" id="att-file" accept="image/*" multiple hidden>
 
   <!-- retour en bas -->
   <button id="to-bottom" hidden>↓</button>
@@ -452,7 +471,7 @@ window.onerror = function(msg, src, line, col){
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const chatEl = $('#chat'), inner = $('#chat-inner'), inp = $('#inp');
-const state = { busy:false, pinned:true, messages:[], models:[], currentModel:'', key:'', conversations:[], settings:{}, mcp:[], reasoningOpen:true, lang:'en' };
+const state = { busy:false, pinned:true, messages:[], models:[], currentModel:'', key:'', conversations:[], settings:{}, mcp:[], reasoningOpen:true, lang:'en', pendingImages:[] };
 
 function post(t, extra) {
   const o = Object.assign({t}, extra||{});
@@ -501,7 +520,7 @@ const I18N = {
 fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation…', settings:'Paramètres',
   welcomeTitle:'Comment puis-je vous aider ?', welcomeSub:'Choisissez un modèle, écrivez votre message, ou commencez avec une suggestion.',
   chips:['Explique-moi les transformers simplement','Écris une fonction Python qui inverse une chaîne','Donne-moi 5 idées de projets avec l\'IA','Résume le concept de RAG en 5 points'],
-  inputPh:'Envoyez un message… /model pour changer de modèle', send:'Envoyer', stop:'Arrêter',
+  inputPh:'Envoyez un message… /model pour changer de modèle', send:'Envoyer', stop:'Arrêter', attTitle:'Joindre une image',
   footerHint:'Entrée = envoyer · Maj+Entrée = nouvelle ligne · /model = modèle · /aide = aide · Échap = arrêter/fermer',
   bannerText:'Clé API manquante — gratuite sur build.nvidia.com. Ouvrez les Paramètres pour la configurer.', bannerBtn:'Configurer',
   pickerTitle:'Choisir le modèle', pickerHint:'↑ ↓ naviguer · Entrée choisir · Échap fermer', pickerFilterPh:'Filtrer les modèles…',
@@ -531,7 +550,7 @@ fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation�
 en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settings:'Settings',
   welcomeTitle:'How can I help you?', welcomeSub:'Pick a model, type your message, or start with a suggestion.',
   chips:['Explain transformers to me simply','Write a Python function that reverses a string','Give me 5 AI project ideas','Summarize the RAG concept in 5 points'],
-  inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop',
+  inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop', attTitle:'Attach an image',
   footerHint:'Enter = send · Shift+Enter = new line · /model = pick model · /help = help · Esc = stop/close',
   bannerText:'Missing API key — free on build.nvidia.com. Open Settings to configure it.', bannerBtn:'Configure',
   pickerTitle:'Choose a model', pickerHint:'↑ ↓ navigate · Enter select · Esc close', pickerFilterPh:'Filter models…',
@@ -561,7 +580,7 @@ en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settin
 es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', settings:'Ajustes',
   welcomeTitle:'¿En qué puedo ayudarte?', welcomeSub:'Elige un modelo, escribe tu mensaje o empieza con una sugerencia.',
   chips:['Explícame los transformers de forma simple','Escribe una función Python que invierta una cadena','Dame 5 ideas de proyectos con IA','Resume el concepto de RAG en 5 puntos'],
-  inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener',
+  inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener', attTitle:'Adjuntar una imagen',
   footerHint:'Intro = enviar · Mayús+Intro = nueva línea · /model = modelo · /help = ayuda · Esc = detener/cerrar',
   bannerText:'Falta la clave API — gratis en build.nvidia.com. Abre los Ajustes para configurarla.', bannerBtn:'Configurar',
   pickerTitle:'Elegir modelo', pickerHint:'↑ ↓ navegar · Intro elegir · Esc cerrar', pickerFilterPh:'Filtrar modelos…',
@@ -591,7 +610,7 @@ es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', 
 de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:'Einstellungen',
   welcomeTitle:'Wie kann ich helfen?', welcomeSub:'Wähle ein Modell, schreibe deine Nachricht oder starte mit einem Vorschlag.',
   chips:['Erkläre mir Transformer einfach','Schreibe eine Python-Funktion, die einen String umdreht','Gib mir 5 KI-Projektideen','Fasse das Konzept RAG in 5 Punkten zusammen'],
-  inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp',
+  inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp', attTitle:'Bild anhängen',
   footerHint:'Enter = senden · Umschalt+Enter = neue Zeile · /model = Modell · /help = Hilfe · Esc = stoppen/schließen',
   bannerText:'API-Schlüssel fehlt — kostenlos auf build.nvidia.com. Öffne die Einstellungen.', bannerBtn:'Konfigurieren',
   pickerTitle:'Modell wählen', pickerHint:'↑ ↓ navigieren · Enter wählen · Esc schließen', pickerFilterPh:'Modelle filtern…',
@@ -621,7 +640,7 @@ de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:
 it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', settings:'Impostazioni',
   welcomeTitle:'Come posso aiutarti?', welcomeSub:'Scegli un modello, scrivi il messaggio o parti da un suggerimento.',
   chips:['Spiegami i transformer in modo semplice','Scrivi una funzione Python che inverte una stringa','Dammi 5 idee di progetti con l\'IA','Riassumi il concetto di RAG in 5 punti'],
-  inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma',
+  inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma', attTitle:'Allega un\'immagine',
   footerHint:'Invio = invia · Maiusc+Invio = nuova riga · /model = modello · /help = aiuto · Esc = ferma/chiudi',
   bannerText:'Chiave API mancante — gratuita su build.nvidia.com. Apri le Impostazioni.', bannerBtn:'Configura',
   pickerTitle:'Scegli il modello', pickerHint:'↑ ↓ naviga · Invio scegli · Esc chiudi', pickerFilterPh:'Filtra i modelli…',
@@ -651,7 +670,7 @@ it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', s
 pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings:'Configurações',
   welcomeTitle:'Como posso ajudar?', welcomeSub:'Escolha um modelo, escreva sua mensagem ou comece com uma sugestão.',
   chips:['Explique os transformers de forma simples','Escreva uma função Python que inverta uma string','Dê-me 5 ideias de projetos com IA','Resuma o conceito de RAG em 5 pontos'],
-  inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar',
+  inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar', attTitle:'Anexar uma imagem',
   footerHint:'Enter = enviar · Shift+Enter = nova linha · /model = modelo · /help = ajuda · Esc = parar/fechar',
   bannerText:'Chave de API ausente — gratuita em build.nvidia.com. Abra as Configurações.', bannerBtn:'Configurar',
   pickerTitle:'Escolher o modelo', pickerHint:'↑ ↓ navegar · Enter escolher · Esc fechar', pickerFilterPh:'Filtrar modelos…',
@@ -714,6 +733,7 @@ function applyI18n(){
   $id('kh1').textContent = t('kh1');
   $id('kh2').textContent = t('kh2');
   $id('key-eye').textContent = t('show');
+  $id('att-btn').title = t('attTitle');
   $id('mcp-name').placeholder = t('mcpNamePh');
   $id('mcp-opt-local').textContent = t('mcpLocal');
   $id('mcp-opt-remote').textContent = t('mcpRemote');
@@ -884,7 +904,11 @@ function aiMessage(o, streaming, openOverride){
 }
 
 function userMessage(o){
+  const atts = (o.thumbs && o.thumbs.length)
+    ? '<div class="atts">' + o.thumbs.map(u => '<img class="att-thumb" src="' + u + '">').join('') + '</div>'
+    : '';
   return '<div class="msg-user"><div style="max-width:72%">' +
+    atts +
     '<div class="bubble" data-raw="' + encodeURIComponent(o.content) + '">' + esc(o.content) + '</div>' +
     '<div class="actions">' +
     '<button class="act" data-act="copy" data-idx="' + o.index + '">' + esc(t('actCopy')) + '</button>' +
@@ -967,7 +991,7 @@ function renderPicker(){
   const list = pickerList();
   $('#picker-list').innerHTML = list.map(m =>
     '<div class="picker-item' + (m === state.currentModel ? ' sel' : '') + '" data-m="' + esc(m) + '">' +
-    '<div><div class="n">' + esc(modelName(m)) + '</div><div class="d">' + esc(modelDesc(m)) + '</div></div>' +
+    '<div><div class="n">' + esc(modelName(m)) + (isVisionModel(m) ? '<span class="vis-b">VISION</span>' : '') + '</div><div class="d">' + esc(modelDesc(m)) + '</div></div>' +
     (m === state.currentModel ? '<div class="picker-check">✓</div>' : '') + '</div>').join('');
 }
 function updatePickerAct(){
@@ -1049,6 +1073,69 @@ function renderMcpList(){
     '<button class="mcp-btn del" data-mcp="remove" data-id="' + esc(m.id) + '">' + esc(t('mcpDelete')) + '</button>' +
     '</div>').join('');
 }
+
+/* ===================== pieces jointes images ===================== */
+function addPendingImage(dataUrl){
+  if (state.pendingImages.length >= 4) return;   // max 4 images par message
+  state.pendingImages.push(dataUrl);
+  renderAttBar();
+}
+function renderAttBar(){
+  const bar = $('#att-bar');
+  bar.hidden = state.pendingImages.length === 0;
+  bar.innerHTML = state.pendingImages.map((u, i) =>
+    '<div class="att-item"><img src="' + u + '"><button class="att-x" data-i="' + i + '">&times;</button></div>').join('');
+}
+function processImageFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      // redimensionner (max 1024px) et recompresser en JPEG pour l'API
+      const maxDim = 1024;
+      let w = img.width, h = img.height;
+      const r = Math.min(1, maxDim / Math.max(w, h));
+      w = Math.max(1, Math.round(w * r)); h = Math.max(1, Math.round(h * r));
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      addPendingImage(cv.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+$('#att-bar').addEventListener('click', e => {
+  const x = e.target.closest('.att-x');
+  if (!x) return;
+  state.pendingImages.splice(+x.dataset.i, 1);
+  renderAttBar();
+});
+$('#att-btn').addEventListener('click', () => $('#att-file').click());
+$('#att-file').addEventListener('change', e => {
+  for (const f of e.target.files) if (f.type && f.type.startsWith('image/')) processImageFile(f);
+  e.target.value = '';
+});
+inp.addEventListener('paste', e => {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const it of items){
+    if (it.type && it.type.startsWith('image/')){
+      const f = it.getAsFile();
+      if (f){ processImageFile(f); e.preventDefault(); }
+    }
+  }
+});
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (!files) return;
+  for (const f of files) if (f.type && f.type.startsWith('image/')) processImageFile(f);
+});
+
+/* badge VISION dans le picker */
+function isVisionModel(id){ return /vision|omni|kimi-k|glimmer|glm-5\.3-flash|deepseek-v4/i.test(id); }
 
 /* ===================== API exposee au C# ===================== */
 window.api = {
@@ -1153,6 +1240,10 @@ window.api = {
     if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
   },
   setKeyMissing: function(b){ document.getElementById('key-banner').style.display = b ? 'flex' : 'none'; },
+  clearImages: function(){
+    state.pendingImages = [];
+    renderAttBar();
+  },
   openLangPicker: function(){ document.getElementById('lang-modal').hidden = false; }
 };
 state.streamModel = '';
@@ -1189,7 +1280,8 @@ inp.addEventListener('keydown', e => {
 
 function doSend(){
   const text = inp.value.trim();
-  if (!text) return;
+  const images = state.pendingImages.slice();
+  if (!text && !images.length) return;
   inp.value = ''; autoGrow();
   const cmd = text.toLowerCase();
   if (cmd === '/model' || cmd === '/models'){ openPicker(); return; }
@@ -1197,7 +1289,7 @@ function doSend(){
   if (cmd === '/export'){ post('export'); return; }
   if (cmd === '/effacer' || cmd === '/clear'){ post('clearMessages'); return; }
   if (cmd === '/aide' || cmd === '/help'){ showHelp(); return; }
-  post('send', {text: text});
+  post('send', {text: text, images: images});
 }
 
 $('#send-btn').addEventListener('click', () => { state.busy ? post('stop') : doSend(); });

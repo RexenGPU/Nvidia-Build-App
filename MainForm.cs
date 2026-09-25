@@ -154,7 +154,19 @@ class MainForm : Form
                 }
             case "rename": RenameConversation(root.GetProperty("id").GetString()); break;
             case "delete": DeleteConvo(root.GetProperty("id").GetString()); break;
-            case "send": DoSend(root.GetProperty("text").GetString() ?? ""); break;
+            case "send":
+                {
+                    var text = root.GetProperty("text").GetString() ?? "";
+                    var images = new List<string>();
+                    if (root.TryGetProperty("images", out var imgs) && imgs.ValueKind == JsonValueKind.Array)
+                        foreach (var im in imgs.EnumerateArray())
+                        {
+                            var s = im.GetString();
+                            if (!string.IsNullOrEmpty(s)) images.Add(s!);
+                        }
+                    DoSend(text, images);
+                    break;
+                }
             case "stop": try { _cts?.Cancel(); } catch { } break;
             case "copy":
                 try { Clipboard.SetText(root.GetProperty("text").GetString() ?? ""); } catch { }
@@ -388,7 +400,8 @@ class MainForm : Form
                     time = m.CreatedAt.ToString("HH:mm"),
                     elapsed = m.ElapsedMs.HasValue ? Math.Round(m.ElapsedMs.Value / 1000.0, 1) : (double?)null,
                     toolName = m.ToolName,
-                    toolCalls = m.ToolCalls?.Select(tc => new { id = tc.Id, name = tc.Name, arguments = tc.Arguments }).ToList()
+                    toolCalls = m.ToolCalls?.Select(tc => new { id = tc.Id, name = tc.Name, arguments = tc.Arguments }).ToList(),
+                    thumbs = m.ImageThumbs
                 });
             }
         }
@@ -485,32 +498,104 @@ class MainForm : Form
         PushStatus();
     }
 
-    void DoSend(string text)
+    void DoSend(string text, List<string>? images = null)
     {
-        if (_busy || text.Trim().Length == 0) return;
+        images ??= new List<string>();
+        if (_busy || (text.Trim().Length == 0 && images.Count == 0)) return;
         if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey))
         {
             RunJs("window.api.openSettings()");
             return;
         }
 
+        var model = CurrentModel();
+        if (images.Count > 0 && ModelList().Contains(model) && !Nvidia.LooksVision(model))
+        {
+            // les images restent dans la barre de pieces jointes (non effacees cote JS)
+            RunJs($"window.api.showError({J(Loc.S("errNoVision"))})");
+            return;
+        }
+
         if (_convo == null)
         {
-            _convo = new Conversation { Model = CurrentModel() };
+            _convo = new Conversation { Model = model };
             _conversations.Insert(0, _convo);
         }
         if (_convo.Messages.Count == 0)
         {
-            var t = text.ReplaceLineEndings(" ");
-            _convo.Title = t.Length > 44 ? t[..44] + "..." : t;
+            var t = text.ReplaceLineEndings(" ").Trim();
+            _convo.Title = t.Length > 0
+                ? (t.Length > 44 ? t[..44] + "..." : t)
+                : (images.Count > 0 ? "Images" : _convo.Title);
         }
 
-        _convo.Messages.Add(new ChatMessage { Role = "user", Content = text });
+        var msg = new ChatMessage { Role = "user", Content = text };
+        if (images.Count > 0)
+        {
+            msg.Images = images;
+            msg.ImageThumbs = images.Select(MakeThumb).ToList();
+        }
+        _convo.Messages.Add(msg);
         _convo.Save();
 
+        if (images.Count > 0) RunJs("window.api.clearImages()");
         PushMessages();
         PushConversations();
         _ = GenerateReplyAsync();
+    }
+
+    /// <summary>Miniature 96px (JPEG) pour l'affichage dans l'UI.</summary>
+    static string MakeThumb(string dataUrl)
+    {
+        try
+        {
+            var comma = dataUrl.IndexOf(',');
+            var bytes = Convert.FromBase64String(dataUrl[(comma + 1)..]);
+            using var ms = new MemoryStream(bytes);
+            using var img = System.Drawing.Image.FromStream(ms);
+            const int box = 96;
+            var ratio = Math.Min((double)box / img.Width, (double)box / img.Height);
+            var nw = Math.Max(1, (int)Math.Round(img.Width * ratio));
+            var nh = Math.Max(1, (int)Math.Round(img.Height * ratio));
+            using var bmp = new System.Drawing.Bitmap(nw, nh);
+            using (var g = System.Drawing.Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(img, 0, 0, nw, nh);
+            }
+            using var outMs = new MemoryStream();
+            bmp.Save(outMs, System.Drawing.Imaging.ImageFormat.Jpeg);
+            return "data:image/jpeg;base64," + Convert.ToBase64String(outMs.ToArray());
+        }
+        catch { return dataUrl; }
+    }
+
+    /// <summary>Titre de conversation genere par le modele apres le premier echange.</summary>
+    async Task GenerateTitleAsync()
+    {
+        var convo = _convo;
+        if (convo == null || Store.Settings.ApiKey.Length == 0) return;
+        try
+        {
+            var firstUser = convo.Messages.FirstOrDefault(m => m.Role == "user");
+            if (firstUser == null) return;
+            var extract = firstUser.Content.ReplaceLineEndings(" ").Trim();
+            if (extract.Length == 0) return;
+            if (extract.Length > 600) extract = extract[..600];
+
+            var title = await LlmClient.CompleteAsync(
+                Nvidia.BaseUrl, Store.Settings.ApiKey, CurrentModel(),
+                new List<ChatMessage> { new() { Role = "user", Content = extract } },
+                Nvidia.TitlePrompt, 50);
+
+            title = title.ReplaceLineEndings(" ").Trim().Trim('"', '\'', '`', '*', '#', '.', ':', '-');
+            if (title.Length == 0) return;
+            if (title.Length > 60) title = title[..60];
+            convo.Title = title;
+            convo.Save();
+            PushConversations();
+        }
+        catch { }
     }
 
     class ToolAcc
@@ -624,6 +709,10 @@ class MainForm : Form
                     int idx = _convo.Messages.Count - 1;
                     double elapsed = Math.Round(sw.Elapsed.TotalSeconds, 1);
                     RunJs($"window.api.streamEnd({J(final.Content)}, {J(final.Reasoning)}, {J(model)}, {idx}, {elapsed.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)})");
+
+                    // auto-titre apres le premier echange
+                    if (_convo.Messages.Count == 2)
+                        _ = GenerateTitleAsync();
                     break;
                 }
 
@@ -712,8 +801,11 @@ class MainForm : Form
         if (index < 0 || index >= _convo.Messages.Count) return;
         if (_convo.Messages[index].Role != "user") return;
 
+        var oldImages = _convo.Messages[index].Images;
+        var oldThumbs = _convo.Messages[index].ImageThumbs;
         _convo.Messages.RemoveRange(index, _convo.Messages.Count - index);
-        _convo.Messages.Add(new ChatMessage { Role = "user", Content = text });
+        var edited = new ChatMessage { Role = "user", Content = text, Images = oldImages, ImageThumbs = oldThumbs };
+        _convo.Messages.Add(edited);
         _convo.Save();
 
         PushMessages();

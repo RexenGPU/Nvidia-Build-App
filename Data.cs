@@ -21,6 +21,10 @@ public static class Nvidia
         "Answer in English unless the user asks for another language. " +
         "Use markdown code blocks when relevant.";
 
+    public const string TitlePrompt =
+        "Give this conversation a very short title (3 to 6 words), in the same language as the user's message. " +
+        "Reply with the title only: no quotes, no trailing punctuation.";
+
     // Modeles de GENERATION TEXTUELLE uniquement — chacun teste un par un sur /chat/completions (25/09/2026)
     public static readonly string[] Models =
     {
@@ -121,6 +125,13 @@ public static class Nvidia
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     public static bool LooksNonChat(string id) => NonChatRx.IsMatch(id);
+
+    // Modeles capables d'analyser des images (vision / omni-modal)
+    static readonly System.Text.RegularExpressions.Regex VisionRx =
+        new("vision|omni|kimi-k|glimmer|glm-5\\.3-flash|deepseek-v4",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    public static bool LooksVision(string id) => VisionRx.IsMatch(id);
 }
 
 public class ChatMessage
@@ -133,6 +144,8 @@ public class ChatMessage
     public string? ToolCallId { get; set; }       // role = tool : id de l'appel
     public string? ToolName { get; set; }          // role = tool : nom de l'outil
     public List<ToolCallData>? ToolCalls { get; set; }  // role = assistant : appels demandes
+    public List<string>? Images { get; set; }      // images jointes (dataUrls) envoyees a l'API
+    public List<string>? ImageThumbs { get; set; } // miniatures pour l'affichage
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 }
 

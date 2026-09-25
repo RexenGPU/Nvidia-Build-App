@@ -29,18 +29,8 @@ public static class LlmClient
         return n?.ToString();
     }
 
-    public static async IAsyncEnumerable<StreamDelta> StreamAsync(
-        string baseUrl,
-        string apiKey,
-        string model,
-        IReadOnlyList<ChatMessage> messages,
-        string? systemPrompt,
-        float temperature,
-        int maxTokens,
-        JsonArray? tools = null,
-        [EnumeratorCancellation] CancellationToken ct = default)
+    static JsonArray BuildMessages(IReadOnlyList<ChatMessage> messages, string? systemPrompt)
     {
-        // ---- construction du payload (JsonNode pour les tool_calls / content null)
         var msgs = new JsonArray();
         if (!string.IsNullOrWhiteSpace(systemPrompt))
             msgs.Add(new JsonObject { ["role"] = "system", ["content"] = systemPrompt });
@@ -66,17 +56,45 @@ public static class LlmClient
                     });
                 o["tool_calls"] = tcs;
             }
+            else if (m.Images is { Count: > 0 })
+            {
+                // contenu multimodal : texte + images (dataUrls)
+                var parts = new JsonArray();
+                if (!string.IsNullOrEmpty(m.Content))
+                    parts.Add(new JsonObject { ["type"] = "text", ["text"] = m.Content });
+                foreach (var img in m.Images)
+                    parts.Add(new JsonObject
+                    {
+                        ["type"] = "image_url",
+                        ["image_url"] = new JsonObject { ["url"] = img }
+                    });
+                o["content"] = parts;
+            }
             else
             {
                 o["content"] = m.Content;
             }
             msgs.Add(o);
         }
+        return msgs;
+    }
 
+    public static async IAsyncEnumerable<StreamDelta> StreamAsync(
+        string baseUrl,
+        string apiKey,
+        string model,
+        IReadOnlyList<ChatMessage> messages,
+        string? systemPrompt,
+        float temperature,
+        int maxTokens,
+        JsonArray? tools = null,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        // ---- construction du payload (JsonNode pour les tool_calls / content null / images)
         var payload = new JsonObject
         {
             ["model"] = model,
-            ["messages"] = msgs,
+            ["messages"] = BuildMessages(messages, systemPrompt),
             ["temperature"] = temperature,
             ["max_tokens"] = maxTokens,
             ["stream"] = true,
@@ -147,6 +165,35 @@ public static class LlmClient
             if (reasoning is not null || content is not null || chunks is not null)
                 yield return new StreamDelta(reasoning, content, chunks);
         }
+    }
+
+    /// <summary>Reponse simple (non-streaming) — utilisee pour l'auto-titre de conversation.</summary>
+    public static async Task<string> CompleteAsync(
+        string baseUrl, string apiKey, string model,
+        IReadOnlyList<ChatMessage> messages, string? systemPrompt,
+        int maxTokens, CancellationToken ct = default)
+    {
+        var payload = new JsonObject
+        {
+            ["model"] = model,
+            ["messages"] = BuildMessages(messages, systemPrompt),
+            ["temperature"] = 0.3,
+            ["max_tokens"] = maxTokens,
+            ["stream"] = false,
+        };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromMinutes(2));
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, baseUrl.TrimEnd('/') + "/chat/completions");
+        req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + apiKey);
+        req.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+        using var resp = await Http.SendAsync(req, cts.Token);
+        var body = await resp.Content.ReadAsStringAsync(cts.Token);
+        if (!resp.IsSuccessStatusCode)
+            throw new LlmException(ExtractError(body, (int)resp.StatusCode), (int)resp.StatusCode);
+
+        var node = JsonNode.Parse(body);
+        return Str((node?["choices"] as JsonArray)?[0]?["message"]?["content"]) ?? "";
     }
 
     /// <summary>GET {base}/models — liste reelle des modeles exposes par l'API.</summary>
