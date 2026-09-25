@@ -1,7 +1,7 @@
 Add-Type -AssemblyName System.Drawing
 
-$src  = "D:\Images\Logo Nvidia Chat.png"
-$out  = "D:\Opencode\NovaChat\assets"
+$src  = "$PSScriptRoot\assets\logo.png"
+$out  = "$PSScriptRoot\assets"
 
 # --- logo 256x256 haute qualite pour l'UI (base64 leger)
 $img = [System.Drawing.Image]::FromFile($src)
