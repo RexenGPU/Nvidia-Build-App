@@ -4,6 +4,8 @@
 
 A ChatGPT-style desktop chat app for Windows, powered by the NVIDIA NIM API ([build.nvidia.com](https://build.nvidia.com)).
 
+**Web showcase:** <https://rexengpu.github.io/Nvidia-Build-App/>
+
 ![Made with C# and the NVIDIA NIM API](https://img.shields.io/badge/API-NVIDIA%20NIM-76b900)
 
 ## Features
