@@ -263,18 +263,31 @@ class MainForm : Form
     List<string> ModelList() =>
         Store.Settings.LiveModels is { Count: > 0 } ? Store.Settings.LiveModels : Nvidia.Models.ToList();
 
-    /// <summary>Recupere la liste reelle des modeles exposes par l'API (evite les 404).</summary>
+    /// <summary>
+    /// Liste auto-adaptee : curates verifies presents sur l'API + nouveaux modeles textuels,
+    /// les modeles disparus ou non-chat sont retires automatiquement.
+    /// </summary>
     async Task RefreshModelsAsync()
     {
         if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey)) return;
         try
         {
-            var models = await LlmClient.FetchModelsAsync(Nvidia.BaseUrl, Store.Settings.ApiKey);
-            if (models.Count > 0)
+            var fetched = await LlmClient.FetchModelsAsync(Nvidia.BaseUrl, Store.Settings.ApiKey);
+
+            var list = Nvidia.Models.Where(fetched.Contains).ToList();   // curates toujours vivants
+            foreach (var m in fetched.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
             {
-                Store.Settings.LiveModels = models;
+                if (list.Contains(m) || Nvidia.Models.Contains(m)) continue;
+                if (Nvidia.KnownExcluded.Contains(m)) continue;         // morts / non-chat connus
+                if (Nvidia.LooksNonChat(m)) continue;                   // nom typique non-chat
+                list.Add(m);                                            // nouveau modele textuel
+            }
+
+            if (list.Count > 0)
+            {
+                Store.Settings.LiveModels = list;
                 Store.SaveSettings();
-                RunJs($"window.api.setModels({J(models)}, {J(CurrentModel())})");
+                RunJs($"window.api.setModels({J(list)}, {J(CurrentModel())})");
             }
         }
         catch { }
@@ -628,6 +641,12 @@ class MainForm : Form
         catch (OperationCanceledException) { RunJs("window.api.cancelStream()"); }
         catch (LlmException ex) when (ex.StatusCode == 404)
         {
+            // modele plus disponible : le retirer de la liste et revenir au modele par defaut
+            if (Store.Settings.LiveModels != null && Store.Settings.LiveModels.RemoveAll(x => x == model) > 0)
+                Store.SaveSettings();
+            if (Store.Settings.LastModel == model) Store.Settings.LastModel = Nvidia.DefaultModel;
+            if (_convo != null && _convo.Model == model) _convo.Model = Nvidia.DefaultModel;
+            RunJs($"window.api.setModels({J(ModelList())}, {J(CurrentModel())})");
             RunJs("window.api.cancelStream()");
             RunJs($"window.api.showError({J(Loc.S("err404"))})");
         }
