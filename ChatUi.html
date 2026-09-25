@@ -122,8 +122,8 @@ button{font-family:inherit}
 
 /* streaming */
 .cursor{display:inline-block;width:8px;height:16px;background:var(--green);border-radius:2px;
-  vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
-@keyframes blink{50%{opacity:0}}
+  vertical-align:-2px;margin-left:2px;animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 
 /* erreur */
 .error-card{border:1px solid #5a2a2a;background:#231616;color:#ff7b72;border-radius:13px;
@@ -292,7 +292,7 @@ button{font-family:inherit}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v1.8</div>
+    <div id="sb-version">NVIDIA Build App · v1.9</div>
   </div>
 </div>
 
@@ -1097,7 +1097,14 @@ window.api = {
     if (!$('#streaming')){
       const div = document.createElement('div');
       div.id = 'streaming';
-      div.innerHTML = aiMessage({content:'', model:model}, true);
+      // structure construite UNE fois : les mises a jour ne font que changer du texte
+      // (le panneau raisonnement n'est jamais detruit/recree -> aucun clignotement)
+      div.innerHTML = '<div class="msg-ai"><img class="avatar" src="{{LOGO}}"><div class="body">' +
+        '<div class="ai-head">NVIDIA BUILD&nbsp; <span>' + esc(modelName(model || '')) + '</span></div>' +
+        '<div class="str-reason-slot"></div>' +
+        '<div class="md str-md"></div>' +
+        '<span class="cursor str-cursor"></span>' +
+        '</div></div>';
       inner.appendChild(div);
       if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
     }
@@ -1105,13 +1112,21 @@ window.api = {
   streamUpdate(content, reasoning){
     const el = $('#streaming');
     if (!el) return;
-    const cur = el.querySelector('details.reasoning');
-    if (cur) state.reasoningOpen = cur.open;      // respecter le choix utilisateur pendant la generation
-    el.innerHTML = aiMessage({content:content, reasoning:reasoning, model:state.streamModel}, true);
+    if (reasoning){
+      const slot = el.querySelector('.str-reason-slot');
+      if (!slot.firstChild){
+        slot.innerHTML = reasoningHtml(reasoning, state.reasoningOpen);   // cree une seule fois
+      } else {
+        slot.querySelector('.rbody').textContent = reasoning;            // mise a jour texte uniquement
+      }
+    }
+    el.querySelector('.str-md').innerHTML = mdToHtml(content);
     if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
   },
   streamEnd(content, reasoning, model, index, elapsed){
     const el = $('#streaming');
+    const curD = el ? el.querySelector('details.reasoning') : null;
+    if (curD) state.reasoningOpen = curD.open;
     const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     const o = {content:content, reasoning:reasoning, model:model, index:index, time:now, elapsed:elapsed};
     const html = aiMessage(o, false, state.reasoningOpen);
