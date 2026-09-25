@@ -1,4 +1,4 @@
-﻿namespace NvidiaBuildApp;
+namespace NvidiaBuildApp;
 
 /// <summary>Localisation cote host : statuts, messages, dates, prompt systeme par defaut. Fallback : anglais.</summary>
 internal static class Loc
@@ -70,12 +70,12 @@ internal static class Loc
         },
         ["errNoVision"] = new()
         {
-            ["fr"] = "Ce modèle ne gère pas les images. Choisissez un modèle vision (Llama 3.2 Vision, Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) avec /model.",
-            ["en"] = "This model does not support images. Pick a vision model (Llama 3.2 Vision, Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) with /model.",
-            ["es"] = "Este modelo no admite imágenes. Elige un modelo de visión (Llama 3.2 Vision, Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) con /model.",
-            ["de"] = "Dieses Modell unterstützt keine Bilder. Wähle ein Vision-Modell (Llama 3.2 Vision, Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) mit /model.",
-            ["it"] = "Questo modello non supporta le immagini. Scegli un modello vision (Llama 3.2 Vision, Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) con /model.",
-            ["pt"] = "Este modelo não aceita imagens. Escolha um modelo de visão (Llama 3.2 Vision, Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) com /model.",
+            ["fr"] = "Ce modèle ne gère pas les images. Choisissez un modèle vision (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) avec /model.",
+            ["en"] = "This model does not support images. Pick a vision model (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) with /model.",
+            ["es"] = "Este modelo no admite imágenes. Elige un modelo de visión (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) con /model.",
+            ["de"] = "Dieses Modell unterstützt keine Bilder. Wähle ein Vision-Modell (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) mit /model.",
+            ["it"] = "Questo modello non supporta le immagini. Scegli un modello vision (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) con /model.",
+            ["pt"] = "Este modelo não aceita imagens. Escolha um modelo de visão (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) com /model.",
         },
         ["rounds"] = new()
         {

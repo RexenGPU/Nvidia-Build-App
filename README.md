@@ -16,7 +16,7 @@ A ChatGPT-style desktop chat app for Windows, powered by the NVIDIA NIM API ([bu
 - **MCP servers** (Model Context Protocol): give the AI tools — local commands (stdio) or remote endpoints (Streamable HTTP)
 - 6 languages: English (default), Fran&ccedil;ais, Espa&ntilde;ol, Deutsch, Italiano, Portugu&ecirc;s — with a first-launch picker
 - Conversation history with search, pin, rename, clear and **export to Markdown**
-- **Vision**: paste, drop or attach images — analyzed by vision models (Llama 3.2 Vision, Kimi K3, Muse Glimmer, Nemotron Omni…), marked with a VISION badge in the picker
+- **Vision**: paste, drop or attach images — analyzed by vision models (Kimi K3, Muse Glimmer, Nemotron Omni…), marked with a VISION badge in the picker
 - **Smart auto-title**: the model names each conversation itself after the first exchange
 - Edit a message and regenerate, copy or delete any message, regenerate any answer
 - Settings: API key, temperature, max tokens, system prompt

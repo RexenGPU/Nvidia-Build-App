@@ -40,8 +40,6 @@ public static class Nvidia
         "openai/gpt-oss-20b",                              // MoE compact raisonnement
         "poolside/laguna-xs-2.1",                          // code agentique 33B MoE
         "meta/muse-glimmer-30b",                           // multimodal + tool calling
-        "meta/llama-3.2-90b-vision-instruct",              // vision + texte, 90B
-        "meta/llama-3.2-11b-vision-instruct",              // vision + texte, 11B
         "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",   // omni-modal raisonnement
         "google/diffusiongemma-26b-a4b-it",                // LLM a diffusion, temps reel
     };
@@ -70,6 +68,8 @@ public static class Nvidia
         "ibm/granite-34b-code-instruct",
         "ibm/granite-8b-code-instruct",
         "meta/codellama-70b",
+        "meta/llama-3.2-11b-vision-instruct",
+        "meta/llama-3.2-90b-vision-instruct",
         "meta/llama-guard-4-12b",
         "meta/llama2-70b",
         "microsoft/kosmos-2",

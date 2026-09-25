@@ -12,7 +12,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);
+body{font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);
      height:100vh;display:flex;overflow:hidden}
 ::selection{background:rgba(118,185,0,.35)}
 ::-webkit-scrollbar{width:10px;height:10px}
@@ -20,6 +20,14 @@ body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(
 ::-webkit-scrollbar-thumb:hover{background:#444}
 ::-webkit-scrollbar-track{background:transparent}
 button{font-family:inherit}
+
+/* micro-interactions + accessibilite */
+button,.chip,.lang-opt,.convo,.picker-item{transition:background .12s,border-color .12s,transform .08s,color .12s}
+button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important;transition:none !important}
+}
 
 /* ---------------- Sidebar ---------------- */
 #sidebar{width:272px;min-width:272px;background:var(--bg2);display:flex;flex-direction:column;padding:12px 12px 10px;border-right:1px solid #1e1e1e}
@@ -137,10 +145,12 @@ button{font-family:inherit}
   color:var(--text);border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}
 #model-pill:hover{border-color:var(--green);background:#222}
 #model-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+#model-pill .dot.busy{animation:dotpulse 1.2s ease-in-out infinite}
+@keyframes dotpulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(118,185,0,.4)}50%{opacity:.4;box-shadow:0 0 0 5px rgba(118,185,0,0)}}
 #model-pill .mp-caret{color:var(--dim);font-size:10px}
 #input-card{max-width:860px;margin:0 auto;background:#262626;border:1px solid var(--border);
   border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:flex-end;transition:border-color .15s}
-#input-card:focus-within{border-color:var(--green)}
+#input-card:focus-within{border-color:var(--green);box-shadow:0 0 0 3px rgba(118,185,0,.10)}
 #inp{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:"Segoe UI",inherit;
   font-size:15px;resize:none;max-height:190px;line-height:1.5;padding:6px 2px}
 #inp::placeholder{color:#666}
@@ -308,7 +318,7 @@ button{font-family:inherit}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v2.1</div>
+    <div id="sb-version">NVIDIA Build App · v2.2</div>
   </div>
 </div>
 
@@ -502,8 +512,6 @@ const MODEL_INFO = {
   "z-ai/glm-5.3": ["GLM-5.3", "MoE 753B · raisonnement + outils"],
   "z-ai/glm-5.3-flash": ["GLM-5.3 Flash", "MoE 320B · multimodal rapide"],
   "moonshotai/kimi-k3": ["Kimi K3", "MoE 2.8T · multimodal"],
-  "meta/llama-3.2-90b-vision-instruct": ["Llama 3.2 90B Vision", "Vision + texte · 90B"],
-  "meta/llama-3.2-11b-vision-instruct": ["Llama 3.2 11B Vision", "Vision + texte · 11B"],
   "google/diffusiongemma-26b-a4b-it": ["DiffusionGemma 26B", "LLM à diffusion · temps réel"],
   "google/gemma-4-31b-it": ["Gemma 4 31B", "Dense · raisonnement & code"],
   "mistralai/mistral-nemotron": ["Mistral Nemotron", "Agentique · code · appels d'outils"],
@@ -1154,6 +1162,8 @@ window.api = {
     const btn = $('#send-btn');
     btn.textContent = b ? t('stop') : t('send');
     btn.classList.toggle('stop', b);
+    const dot = document.querySelector('#model-pill .dot');
+    if (dot) dot.classList.toggle('busy', b);
   },
   setStatus(s){
     $('#status').textContent = s;
@@ -1266,7 +1276,7 @@ chatEl.addEventListener('scroll', () => {
 });
 $('#to-bottom').addEventListener('click', () => {
   state.pinned = true;
-  chatEl.scrollTop = chatEl.scrollHeight;
+  chatEl.scrollTo({top: chatEl.scrollHeight, behavior: 'smooth'});
   $('#to-bottom').hidden = true;
 });
 
