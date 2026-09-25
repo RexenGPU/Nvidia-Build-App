@@ -292,7 +292,7 @@ button{font-family:inherit}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v1.9</div>
+    <div id="sb-version">NVIDIA Build App · v2.0</div>
   </div>
 </div>
 
@@ -1075,7 +1075,16 @@ window.api = {
       state.statusTimer = setTimeout(() => { $('#status').textContent = defaultStatus(); }, 4500);
   },
   setKey(k){ state.key = k || ''; },
-  setSettings(s){ state.settings = s || {}; },
+  setSettings(s){
+    state.settings = s || {};
+    // si les Parametres sont ouverts, reactualiser le prompt systeme
+    // (evite d'ecraser la bascule de langue avec l'ancien texte au moment d'Enregistrer)
+    const modal = document.getElementById('key-modal');
+    if (modal && !modal.hidden){
+      const ta = document.getElementById('sysprompt-input');
+      if (ta) ta.value = state.settings.systemPrompt || '';
+    }
+  },
   setMcp(rows){ state.mcp = rows || []; renderMcpList(); },
   openSettings: openSettings,
   openPicker: openPicker,

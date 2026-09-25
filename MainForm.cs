@@ -45,6 +45,18 @@ class MainForm : Form
 
         _conversations.AddRange(Store.LoadConversations());
         if (_conversations.Count > 0) _convo = _conversations[0];
+
+        // relocalisation auto au demarrage : le prompt systeme suit la langue de l'interface
+        // s'il correspond a un defaut connu d'une autre langue (etat mixte apres un ancien bug)
+        foreach (var l in Loc.Languages)
+        {
+            if (l != Loc.L && Store.Settings.SystemPrompt == Loc.Sys(l))
+            {
+                Store.Settings.SystemPrompt = Loc.Sys(Loc.L);
+                Store.SaveSettings();
+                break;
+            }
+        }
     }
 
     async Task InitAsync()
@@ -222,8 +234,18 @@ class MainForm : Form
                     var lang = root.GetProperty("lang").GetString() ?? "en";
                     if (!Loc.Languages.Contains(lang)) lang = "en";
                     var prev = string.IsNullOrWhiteSpace(Store.Settings.Lang) ? "en" : Store.Settings.Lang;
-                    if (prev != lang && Store.Settings.SystemPrompt == Loc.Sys(prev))
-                        Store.Settings.SystemPrompt = Loc.Sys(lang);
+                    if (prev != lang)
+                    {
+                        // si le prompt est un defaut connu (quelle que soit la langue), le relocaliser
+                        foreach (var l in Loc.Languages)
+                        {
+                            if (Store.Settings.SystemPrompt == Loc.Sys(l))
+                            {
+                                Store.Settings.SystemPrompt = Loc.Sys(lang);
+                                break;
+                            }
+                        }
+                    }
                     bool wasFirstRun = Store.Settings.FirstRun;
                     Store.Settings.Lang = lang;
                     Store.Settings.FirstRun = false;
