@@ -241,6 +241,10 @@ class MainForm : Form
                     break;
                 }
             case "deleteAllConvos": DeleteAllConversations(); break;
+            case "setAutoSpeak":
+                Store.Settings.AutoSpeak = root.GetProperty("value").GetBoolean();
+                Store.SaveSettings();
+                break;
             case "setLang":
                 {
                     var lang = root.GetProperty("lang").GetString() ?? "en";
@@ -334,7 +338,8 @@ class MainForm : Form
             key = Store.Settings.ApiKey,
             temperature = Store.Settings.Temperature,
             maxTokens = Store.Settings.MaxTokens,
-            systemPrompt = Store.Settings.SystemPrompt
+            systemPrompt = Store.Settings.SystemPrompt,
+            autoSpeak = Store.Settings.AutoSpeak
         })})");
     }
 

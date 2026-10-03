@@ -147,6 +147,13 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 #model-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
 #model-pill .dot.busy{animation:dotpulse 1.2s ease-in-out infinite}
 @keyframes dotpulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(118,185,0,.4)}50%{opacity:.4;box-shadow:0 0 0 5px rgba(118,185,0,0)}}
+#tts-pill{display:inline-flex;align-items:center;gap:8px;background:#1d1d1d;border:1px solid var(--border);
+  color:var(--dim);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;margin-left:8px}
+#tts-pill:hover{border-color:#555;color:var(--text)}
+#tts-pill .dot{width:8px;height:8px;border-radius:50%;background:#555;flex-shrink:0}
+#tts-pill.on{border-color:var(--green);color:var(--green-soft)}
+#tts-pill.on .dot{background:var(--green)}
+.act.speaking{color:var(--green-soft)}
 #model-pill .mp-caret{color:var(--dim);font-size:10px}
 #input-card{max-width:860px;margin:0 auto;background:#262626;border:1px solid var(--border);
   border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:flex-end;transition:border-color .15s}
@@ -318,7 +325,7 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v2.4</div>
+    <div id="sb-version">NVIDIA Build App · v2.5</div>
   </div>
 </div>
 
@@ -341,6 +348,9 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
     <div id="model-bar">
       <button id="model-pill" title="Changer de modèle (ou tapez /model)">
         <span class="dot"></span><span id="mp-name">…</span><span class="mp-caret">&#9662;</span>
+      </button>
+      <button id="tts-pill" title="Lecture automatique des réponses">
+        <span class="dot"></span><span id="tts-label">Lecture auto</span>
       </button>
     </div>
     <div id="att-bar" hidden></div>
@@ -545,7 +555,8 @@ fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation�
   wipe:'Effacer toutes les conversations', wipeConfirm:'Confirmer : tout effacer définitivement ?',
   save:'Enregistrer', cancel:'Annuler',
   ctxOpen:'Ouvrir', ctxRename:'Renommer', ctxPin:'Épingler', ctxUnpin:'Détacher', ctxExport:'Exporter (.md)', ctxClear:'Effacer les messages', ctxDelete:'Supprimer', ctxConfirmDel:'Confirmer la suppression ?',
-  actCopy:'Copier', actRegen:'Régénérer', actDelete:'Supprimer', actEdit:'Éditer',
+  actCopy:'Copier', actRegen:'Régénérer', actDelete:'Supprimer', actEdit:'Éditer', read:'Lire', stopRead:'Arrêter',
+  autoRead:'Lecture auto', noVoice:'Aucune voix installée pour cette langue — ajoutez-en une dans Windows (Paramètres > Heure et langue > Voix)',
   editSave:'Enregistrer (régénère)', editCancel:'Annuler',
   reasoning:'Raisonnement', toolUsed:'Outil(s) utilisé(s) : {n}', toolHead:'OUTIL', toolResult:'Résultat de l\'outil',
   errTitle:'Erreur', copy:'Copier', copied:'Copié !',
@@ -575,7 +586,7 @@ en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settin
   wipe:'Delete all conversations', wipeConfirm:'Confirm: erase everything permanently?',
   save:'Save', cancel:'Cancel',
   ctxOpen:'Open', ctxRename:'Rename', ctxPin:'Pin', ctxUnpin:'Unpin', ctxExport:'Export (.md)', ctxClear:'Clear messages', ctxDelete:'Delete', ctxConfirmDel:'Confirm deletion?',
-  actCopy:'Copy', actRegen:'Regenerate', actDelete:'Delete', actEdit:'Edit',
+  actCopy:'Copy', actRegen:'Regenerate', actDelete:'Delete', actEdit:'Edit', read:'Read', stopRead:'Stop', autoRead:'Auto-read', noVoice:'No voice installed for this language - add one in Windows (Settings > Time and language > Speech)',
   editSave:'Save (regenerates)', editCancel:'Cancel',
   reasoning:'Reasoning', toolUsed:'Tool call(s): {n}', toolHead:'TOOL', toolResult:'Tool result',
   errTitle:'Error', copy:'Copy', copied:'Copied!',
@@ -605,7 +616,7 @@ es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', 
   wipe:'Eliminar todas las conversaciones', wipeConfirm:'Confirmar: ¿borrar todo definitivamente?',
   save:'Guardar', cancel:'Cancelar',
   ctxOpen:'Abrir', ctxRename:'Renombrar', ctxPin:'Fijar', ctxUnpin:'Quitar fijado', ctxExport:'Exportar (.md)', ctxClear:'Vaciar mensajes', ctxDelete:'Eliminar', ctxConfirmDel:'¿Confirmar eliminación?',
-  actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Eliminar', actEdit:'Editar',
+  actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Eliminar', actEdit:'Editar', read:'Leer', stopRead:'Detener', autoRead:'Lectura auto', noVoice:'No hay ninguna voz instalada para este idioma - anade una en Windows (Configuracion > Hora e idioma > Voz)',
   editSave:'Guardar (regenera)', editCancel:'Cancelar',
   reasoning:'Razonamiento', toolUsed:'Herramienta(s) usada(s): {n}', toolHead:'HERRAMIENTA', toolResult:'Resultado de la herramienta',
   errTitle:'Error', copy:'Copiar', copied:'¡Copiado!',
@@ -635,7 +646,7 @@ de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:
   wipe:'Alle Unterhaltungen löschen', wipeConfirm:'Bestätigen: endgültig alles löschen?',
   save:'Speichern', cancel:'Abbrechen',
   ctxOpen:'Öffnen', ctxRename:'Umbenennen', ctxPin:'Anheften', ctxUnpin:'Lösen', ctxExport:'Exportieren (.md)', ctxClear:'Nachrichten leeren', ctxDelete:'Löschen', ctxConfirmDel:'Löschen bestätigen?',
-  actCopy:'Kopieren', actRegen:'Neu generieren', actDelete:'Löschen', actEdit:'Bearbeiten',
+  actCopy:'Kopieren', actRegen:'Neu generieren', actDelete:'Löschen', actEdit:'Bearbeiten', read:'Lesen', stopRead:'Stopp', autoRead:'Auto-Vorlesen', noVoice:'Keine Stimme für diese Sprache installiert - füge eine in Windows hinzu (Einstellungen > Zeit und Sprache > Sprache)',
   editSave:'Speichern (generiert neu)', editCancel:'Abbrechen',
   reasoning:'Denkprozess', toolUsed:'Werkzeug(e) genutzt: {n}', toolHead:'WERKZEUG', toolResult:'Werkzeugergebnis',
   errTitle:'Fehler', copy:'Kopieren', copied:'Kopiert!',
@@ -665,7 +676,7 @@ it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', s
   wipe:'Elimina tutte le conversazioni', wipeConfirm:'Confermi: cancellare tutto definitivamente?',
   save:'Salva', cancel:'Annulla',
   ctxOpen:'Apri', ctxRename:'Rinomina', ctxPin:'Fissa', ctxUnpin:'Sblocca', ctxExport:'Esporta (.md)', ctxClear:'Svuota i messaggi', ctxDelete:'Elimina', ctxConfirmDel:'Confermi l\'eliminazione?',
-  actCopy:'Copia', actRegen:'Rigenera', actDelete:'Elimina', actEdit:'Modifica',
+  actCopy:'Copia', actRegen:'Rigenera', actDelete:'Elimina', actEdit:'Modifica', read:'Leggi', stopRead:'Ferma', autoRead:'Lettura auto', noVoice:'Nessuna voce installata per questa lingua - aggiungine una in Windows (Impostazioni > Ora e lingua > Voce)',
   editSave:'Salva (rigenera)', editCancel:'Annulla',
   reasoning:'Ragionamento', toolUsed:'Strumento(i) usato(i): {n}', toolHead:'STRUMENTO', toolResult:'Risultato dello strumento',
   errTitle:'Errore', copy:'Copia', copied:'Copiato!',
@@ -695,7 +706,7 @@ pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings
   wipe:'Excluir todas as conversas', wipeConfirm:'Confirmar: apagar tudo definitivamente?',
   save:'Salvar', cancel:'Cancelar',
   ctxOpen:'Abrir', ctxRename:'Renomear', ctxPin:'Fixar', ctxUnpin:'Desafixar', ctxExport:'Exportar (.md)', ctxClear:'Limpar mensagens', ctxDelete:'Excluir', ctxConfirmDel:'Confirmar exclusão?',
-  actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Excluir', actEdit:'Editar',
+  actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Excluir', actEdit:'Editar', read:'Ler', stopRead:'Parar', autoRead:'Leitura auto', noVoice:'Nenhuma voz instalada para este idioma - adicione uma no Windows (Configuracoes > Hora e idioma > Fala)',
   editSave:'Salvar (regenera)', editCancel:'Cancelar',
   reasoning:'Raciocínio', toolUsed:'Ferramenta(s) usada(s): {n}', toolHead:'FERRAMENTA', toolResult:'Resultado da ferramenta',
   errTitle:'Erro', copy:'Copiar', copied:'Copiado!',
@@ -901,6 +912,7 @@ function aiMessage(o, streaming, openOverride){
   if (!streaming){
     actions = '<div class="actions">' +
       '<button class="act" data-act="copy" data-idx="' + o.index + '">' + esc(t('actCopy')) + '</button>' +
+      '<button class="act" data-act="speak" data-idx="' + o.index + '">' + esc(t('read')) + '</button>' +
       '<button class="act" data-act="regen" data-idx="' + o.index + '">' + esc(t('actRegen')) + '</button>' +
       '<button class="act" data-act="del" data-idx="' + o.index + '">' + esc(t('actDelete')) + '</button></div>';
   }
@@ -966,6 +978,7 @@ function showHelp(){
 }
 
 function rebuildChat(){
+  stopSpeak();
   const msgs = state.messages;
   if (!msgs.length){
     inner.innerHTML = welcomeHtml();
@@ -1145,6 +1158,73 @@ document.addEventListener('drop', e => {
 /* badge VISION dans le picker */
 function isVisionModel(id){ return /vision|omni|kimi-k|glimmer|glm-5\.3-flash|deepseek-v4/i.test(id); }
 
+/* ===================== TTS (lecture vocale, toutes langues) ===================== */
+const SPEECH_LANGS = { fr:'fr-FR', en:'en-US', es:'es-ES', de:'de-DE', it:'it-IT', pt:'pt-BR' };
+let speakingIdx = -1;
+
+function stripForSpeech(md){
+  let s = md || '';
+  s = s.replace(/```[\s\S]*?```/g, ' ');            // blocs de code
+  s = s.replace(/`([^`]+)`/g, '$1');               // code inline
+  s = s.replace(/\*\*([^*]+)\*\*/g, '$1');          // gras
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');  // liens
+  s = s.replace(/^[>#\-*+=]+/gm, ' ');             // titres, citations, puces
+  s = s.replace(/\|/g, ' ');                        // tableaux
+  s = s.replace(/[_~#]/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+function refreshSpeakButtons(){
+  Array.from(document.querySelectorAll('.act[data-act="speak"]')).forEach(b => {
+    const on = (+b.dataset.idx === speakingIdx);
+    b.textContent = on ? t('stopRead') : t('read');
+    b.classList.toggle('speaking', on);
+  });
+}
+
+function stopSpeak(){
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (speakingIdx !== -1){ speakingIdx = -1; refreshSpeakButtons(); }
+}
+
+function speakMessage(idx, text){
+  if (!window.speechSynthesis) return;
+  if (speakingIdx === idx){ stopSpeak(); return; }   // clic sur "Arreter"
+  stopSpeak();
+  const clean = stripForSpeech(text);
+  if (!clean) return;
+  const lang = SPEECH_LANGS[state.lang] || 'en-US';
+  const voices = speechSynthesis.getVoices();
+  const voice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith(lang.slice(0, 2)));
+  if (!voice){
+    $('#status').textContent = t('noVoice');
+    clearTimeout(state.statusTimer);
+    state.statusTimer = setTimeout(() => { $('#status').textContent = defaultStatus(); }, 5000);
+  }
+  const u = new SpeechSynthesisUtterance(clean.slice(0, 6000));
+  u.lang = lang;
+  if (voice) u.voice = voice;
+  u.onend = () => { if (speakingIdx === idx){ speakingIdx = -1; refreshSpeakButtons(); } };
+  u.onerror = () => { if (speakingIdx === idx){ speakingIdx = -1; refreshSpeakButtons(); } };
+  speakingIdx = idx;
+  refreshSpeakButtons();
+  speechSynthesis.speak(u);
+}
+
+function updateTtsPill(){
+  const b = document.getElementById('tts-pill');
+  if (!b) return;
+  b.classList.toggle('on', !!state.settings.autoSpeak);
+  document.getElementById('tts-label').textContent = t('autoRead');
+  b.title = t('autoRead');
+}
+document.getElementById('tts-pill').addEventListener('click', () => {
+  state.settings.autoSpeak = !state.settings.autoSpeak;
+  updateTtsPill();
+  post('setAutoSpeak', {value: state.settings.autoSpeak});
+});
+
 /* ===================== API exposee au C# ===================== */
 window.api = {
   setLang(lang){
@@ -1174,6 +1254,7 @@ window.api = {
   setKey(k){ state.key = k || ''; },
   setSettings(s){
     state.settings = s || {};
+    updateTtsPill();
     // si les Parametres sont ouverts, reactualiser le prompt systeme
     // (evite d'ecraser la bascule de langue avec l'ancien texte au moment d'Enregistrer)
     const modal = document.getElementById('key-modal');
@@ -1239,6 +1320,7 @@ window.api = {
     if (el) el.outerHTML = html;
     else inner.insertAdjacentHTML('beforeend', html);
     if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
+    if (state.settings.autoSpeak && content) speakMessage(index, content);   // lecture auto
   },
   cancelStream(){ const el = $('#streaming'); if (el) el.remove(); },
   showError(text){
@@ -1448,6 +1530,10 @@ const el = e.target.closest('.chip');
     else if (act.dataset.act === 'regen'){ post('regenerate', {index: idx}); }
     else if (act.dataset.act === 'del'){ post('deleteMsg', {index: idx}); }
     else if (act.dataset.act === 'edit'){ startEdit(idx); }
+    else if (act.dataset.act === 'speak'){
+      const m = state.messages[idx];
+      speakMessage(idx, m ? (m.content || '') : '');
+    }
   }
 });
 

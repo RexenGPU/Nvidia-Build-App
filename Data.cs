@@ -193,6 +193,7 @@ public class AppSettings
     public string? LastModel { get; set; }
     public string Lang { get; set; } = "en";
     public bool FirstRun { get; set; } = true;
+    public bool AutoSpeak { get; set; } = false;   // lecture vocale automatique des reponses
     public List<string>? LiveModels { get; set; }   // liste reelle recuperee de l'API (GET /models)
     public float Temperature { get; set; } = 0.7f;
     public int MaxTokens { get; set; } = 8192;
