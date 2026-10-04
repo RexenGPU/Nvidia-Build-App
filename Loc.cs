@@ -68,6 +68,31 @@ internal static class Loc
             ["fr"] = "(réponse vide)", ["en"] = "(empty reply)", ["es"] = "(respuesta vacía)",
             ["de"] = "(leere Antwort)", ["it"] = "(risposta vuota)", ["pt"] = "(resposta vazia)",
         },
+        ["listen"] = new()
+        {
+            ["fr"] = "Écoute…", ["en"] = "Listening…", ["es"] = "Escuchando…",
+            ["de"] = "Aufnahme…", ["it"] = "In ascolto…", ["pt"] = "Ouvindo…",
+        },
+        ["micDenied"] = new()
+        {
+            ["fr"] = "Micro indisponible — vérifiez les autorisations (Paramètres Windows > Confidentialité > Micro)",
+            ["en"] = "Microphone unavailable — check permissions (Windows Settings > Privacy > Microphone)",
+            ["es"] = "Micrófono no disponible - comprueba los permisos (Configuración de Windows > Privacidad > Micrófono)",
+            ["de"] = "Mikrofon nicht verfügbar - Berechtigungen prüfen (Windows-Einstellungen > Datenschutz > Mikrofon)",
+            ["it"] = "Microfono non disponibile - controlla le autorizzazioni (Impostazioni Windows > Privacy > Microfono)",
+            ["pt"] = "Microfone indisponível - verifique as permissões (Configurações do Windows > Privacidade > Microfone)",
+        },
+        ["sttEmpty"] = new()
+        {
+            ["fr"] = "Aucune parole détectée", ["en"] = "No speech detected", ["es"] = "No se detectó voz",
+            ["de"] = "Keine Sprache erkannt", ["it"] = "Nessuna voce rilevata", ["pt"] = "Nenhuma fala detectada",
+        },
+        ["sttErr"] = new()
+        {
+            ["fr"] = "Échec de la reconnaissance vocale : ", ["en"] = "Speech recognition failed: ",
+            ["es"] = "Fallo de reconocimiento de voz: ", ["de"] = "Spracherkennung fehlgeschlagen: ",
+            ["it"] = "Riconoscimento vocale non riuscito: ", ["pt"] = "Falha no reconhecimento de fala: ",
+        },
         ["errNoVision"] = new()
         {
             ["fr"] = "Ce modèle ne gère pas les images. Choisissez un modèle vision (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) avec /model.",

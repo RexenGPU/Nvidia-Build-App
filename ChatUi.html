@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -203,6 +203,9 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 .att-x:hover{background:#ff7b72}
 #att-btn{background:#1d1d1d;border:1px solid var(--border);color:var(--dim);border-radius:13px;width:46px;height:46px;
   font-size:21px;cursor:pointer;flex-shrink:0;transition:.15s;line-height:1}
+#mic-btn{background:#1d1d1d;border:1px solid var(--border);color:var(--dim);border-radius:13px;width:46px;height:46px;
+  font-size:15px;cursor:pointer;flex-shrink:0;transition:.15s;line-height:1}
+#mic-btn.rec{background:#3a2222;border-color:#ff7b72;color:#ff7b72;animation:dotpulse 1.2s ease-in-out infinite}
 #att-btn:hover{border-color:var(--green);color:var(--text)}
 .atts{display:flex;gap:6px;justify-content:flex-end;margin-bottom:7px;flex-wrap:wrap}
 .att-thumb{width:74px;height:74px;object-fit:cover;border-radius:10px;border:1px solid #3a3a3a}
@@ -325,7 +328,7 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v2.5</div>
+    <div id="sb-version">NVIDIA Build App · v2.6</div>
   </div>
 </div>
 
@@ -355,6 +358,7 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
     </div>
     <div id="att-bar" hidden></div>
     <div id="input-card">
+      <button id="mic-btn" title="Dicter">&#9679;</button>
       <button id="att-btn" title="Joindre une image">+</button>
       <textarea id="inp" rows="1" placeholder="Envoyez un message… /model pour changer de modèle"></textarea>
       <button id="send-btn">Envoyer</button>
@@ -538,7 +542,7 @@ const I18N = {
 fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation…', settings:'Paramètres',
   welcomeTitle:'Comment puis-je vous aider ?', welcomeSub:'Choisissez un modèle, écrivez votre message, ou commencez avec une suggestion.',
   chips:['Explique-moi les transformers simplement','Écris une fonction Python qui inverse une chaîne','Donne-moi 5 idées de projets avec l\'IA','Résume le concept de RAG en 5 points'],
-  inputPh:'Envoyez un message… /model pour changer de modèle', send:'Envoyer', stop:'Arrêter', attTitle:'Joindre une image',
+  inputPh:'Envoyez un message… /model pour changer de modèle', send:'Envoyer', stop:'Arrêter', attTitle:'Joindre une image', micTitle:'Dicter',
   footerHint:'Entrée = envoyer · Maj+Entrée = nouvelle ligne · /model = modèle · /aide = aide · Échap = arrêter/fermer',
   bannerText:'Clé API manquante — gratuite sur build.nvidia.com. Ouvrez les Paramètres pour la configurer.', bannerBtn:'Configurer',
   pickerTitle:'Choisir le modèle', pickerHint:'↑ ↓ naviguer · Entrée choisir · Échap fermer', pickerFilterPh:'Filtrer les modèles…',
@@ -569,7 +573,7 @@ fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation�
 en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settings:'Settings',
   welcomeTitle:'How can I help you?', welcomeSub:'Pick a model, type your message, or start with a suggestion.',
   chips:['Explain transformers to me simply','Write a Python function that reverses a string','Give me 5 AI project ideas','Summarize the RAG concept in 5 points'],
-  inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop', attTitle:'Attach an image',
+  inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop', attTitle:'Attach an image', micTitle:'Dictate',
   footerHint:'Enter = send · Shift+Enter = new line · /model = pick model · /help = help · Esc = stop/close',
   bannerText:'Missing API key — free on build.nvidia.com. Open Settings to configure it.', bannerBtn:'Configure',
   pickerTitle:'Choose a model', pickerHint:'↑ ↓ navigate · Enter select · Esc close', pickerFilterPh:'Filter models…',
@@ -599,7 +603,7 @@ en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settin
 es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', settings:'Ajustes',
   welcomeTitle:'¿En qué puedo ayudarte?', welcomeSub:'Elige un modelo, escribe tu mensaje o empieza con una sugerencia.',
   chips:['Explícame los transformers de forma simple','Escribe una función Python que invierta una cadena','Dame 5 ideas de proyectos con IA','Resume el concepto de RAG en 5 puntos'],
-  inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener', attTitle:'Adjuntar una imagen',
+  inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener', attTitle:'Adjuntar una imagen', micTitle:'Dictar',
   footerHint:'Intro = enviar · Mayús+Intro = nueva línea · /model = modelo · /help = ayuda · Esc = detener/cerrar',
   bannerText:'Falta la clave API — gratis en build.nvidia.com. Abre los Ajustes para configurarla.', bannerBtn:'Configurar',
   pickerTitle:'Elegir modelo', pickerHint:'↑ ↓ navegar · Intro elegir · Esc cerrar', pickerFilterPh:'Filtrar modelos…',
@@ -629,7 +633,7 @@ es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', 
 de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:'Einstellungen',
   welcomeTitle:'Wie kann ich helfen?', welcomeSub:'Wähle ein Modell, schreibe deine Nachricht oder starte mit einem Vorschlag.',
   chips:['Erkläre mir Transformer einfach','Schreibe eine Python-Funktion, die einen String umdreht','Gib mir 5 KI-Projektideen','Fasse das Konzept RAG in 5 Punkten zusammen'],
-  inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp', attTitle:'Bild anhängen',
+  inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp', attTitle:'Bild anhängen', micTitle:'Diktieren',
   footerHint:'Enter = senden · Umschalt+Enter = neue Zeile · /model = Modell · /help = Hilfe · Esc = stoppen/schließen',
   bannerText:'API-Schlüssel fehlt — kostenlos auf build.nvidia.com. Öffne die Einstellungen.', bannerBtn:'Konfigurieren',
   pickerTitle:'Modell wählen', pickerHint:'↑ ↓ navigieren · Enter wählen · Esc schließen', pickerFilterPh:'Modelle filtern…',
@@ -659,7 +663,7 @@ de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:
 it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', settings:'Impostazioni',
   welcomeTitle:'Come posso aiutarti?', welcomeSub:'Scegli un modello, scrivi il messaggio o parti da un suggerimento.',
   chips:['Spiegami i transformer in modo semplice','Scrivi una funzione Python che inverte una stringa','Dammi 5 idee di progetti con l\'IA','Riassumi il concetto di RAG in 5 punti'],
-  inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma', attTitle:'Allega un\'immagine',
+  inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma', attTitle:'Allega un\'immagine', micTitle:'Dettare',
   footerHint:'Invio = invia · Maiusc+Invio = nuova riga · /model = modello · /help = aiuto · Esc = ferma/chiudi',
   bannerText:'Chiave API mancante — gratuita su build.nvidia.com. Apri le Impostazioni.', bannerBtn:'Configura',
   pickerTitle:'Scegli il modello', pickerHint:'↑ ↓ naviga · Invio scegli · Esc chiudi', pickerFilterPh:'Filtra i modelli…',
@@ -689,7 +693,7 @@ it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', s
 pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings:'Configurações',
   welcomeTitle:'Como posso ajudar?', welcomeSub:'Escolha um modelo, escreva sua mensagem ou comece com uma sugestão.',
   chips:['Explique os transformers de forma simples','Escreva uma função Python que inverta uma string','Dê-me 5 ideias de projetos com IA','Resuma o conceito de RAG em 5 pontos'],
-  inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar', attTitle:'Anexar uma imagem',
+  inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar', attTitle:'Anexar uma imagem', micTitle:'Ditar',
   footerHint:'Enter = enviar · Shift+Enter = nova linha · /model = modelo · /help = ajuda · Esc = parar/fechar',
   bannerText:'Chave de API ausente — gratuita em build.nvidia.com. Abra as Configurações.', bannerBtn:'Configurar',
   pickerTitle:'Escolher o modelo', pickerHint:'↑ ↓ navegar · Enter escolher · Esc fechar', pickerFilterPh:'Filtrar modelos…',
@@ -753,6 +757,8 @@ function applyI18n(){
   $id('kh2').textContent = t('kh2');
   $id('key-eye').textContent = t('show');
   $id('att-btn').title = t('attTitle');
+  $id('mic-btn').title = t('micTitle');
+
   $id('mcp-name').placeholder = t('mcpNamePh');
   $id('mcp-opt-local').textContent = t('mcpLocal');
   $id('mcp-opt-remote').textContent = t('mcpRemote');
@@ -1133,6 +1139,10 @@ $('#att-bar').addEventListener('click', e => {
   renderAttBar();
 });
 $('#att-btn').addEventListener('click', () => $('#att-file').click());
+$('#mic-btn').addEventListener('click', () => {
+  if ($('#mic-btn').classList.contains('rec')) post('dictateStop');
+  else post('dictate');
+});
 $('#att-file').addEventListener('change', e => {
   for (const f of e.target.files) if (f.type && f.type.startsWith('image/')) processImageFile(f);
   e.target.value = '';
@@ -1335,6 +1345,18 @@ window.api = {
   clearImages: function(){
     state.pendingImages = [];
     renderAttBar();
+  },
+  micState: function(b){
+    const m = document.getElementById('mic-btn');
+    if (m) m.classList.toggle('rec', !!b);
+  },
+  insertDictation: function(text){
+    const el = document.getElementById('inp');
+    const cur = el.value;
+    el.value = cur ? cur.replace(/\s+$/, '') + ' ' + text : text;
+    autoGrow();
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
   },
   openLangPicker: function(){ document.getElementById('lang-modal').hidden = false; }
 };
@@ -1599,6 +1621,7 @@ window.addEventListener('load', () => { autoGrow(); const ls = document.getEleme
 </script>
 </body>
 </html>
+
 
 
 

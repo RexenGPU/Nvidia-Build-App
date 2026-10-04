@@ -245,6 +245,11 @@ class MainForm : Form
                 Store.Settings.AutoSpeak = root.GetProperty("value").GetBoolean();
                 Store.SaveSettings();
                 break;
+            case "dictate": _ = StartDictationAsync(); break;
+            case "dictateStop":
+                _dictationCancelled = true;
+                try { _recognizer?.Dispose(); } catch { }
+                break;
             case "setLang":
                 {
                     var lang = root.GetProperty("lang").GetString() ?? "en";
@@ -890,6 +895,76 @@ class MainForm : Form
         {
             MessageBox.Show(Loc.S("exportFail") + ex.Message, "NVIDIA Build App",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    // ---------------------------------------------------------------- dictee vocale (STT Windows natif, offline)
+
+    Windows.Media.SpeechRecognition.SpeechRecognizer? _recognizer;
+    bool _dictationCancelled;
+
+    async Task StartDictationAsync()
+    {
+        var tag = Loc.L switch
+        {
+            "fr" => "fr-FR", "en" => "en-US", "es" => "es-ES",
+            "de" => "de-DE", "it" => "it-IT", _ => "pt-BR",
+        };
+        _dictationCancelled = false;
+
+        try
+        {
+            RunJs("window.api.micState(true)");
+            RunJs($"window.api.setStatus({J(Loc.S("listen"))})");
+
+            var result = await TryRecognizeAsync(tag) ?? await TryRecognizeAsync(null);
+
+            if (result != null && !string.IsNullOrWhiteSpace(result.Text))
+            {
+                RunJs($"window.api.insertDictation({J(result.Text.Trim())})");
+            }
+            else if (!_dictationCancelled)
+            {
+                RunJs($"window.api.setStatus({J(Loc.S("sttEmpty"))})");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!_dictationCancelled)
+                RunJs($"window.api.setStatus({J(Loc.S("micDenied") + " — " + ex.Message)})");
+        }
+        finally
+        {
+            RunJs("window.api.micState(false)");
+            if (_dictationCancelled) PushStatus();
+        }
+    }
+
+    async Task<Windows.Media.SpeechRecognition.SpeechRecognitionResult?> TryRecognizeAsync(string? tag)
+    {
+        Windows.Media.SpeechRecognition.SpeechRecognizer rec;
+        try
+        {
+            rec = tag == null
+                ? new Windows.Media.SpeechRecognition.SpeechRecognizer()
+                : new Windows.Media.SpeechRecognition.SpeechRecognizer(new Windows.Globalization.Language(tag));
+        }
+        catch
+        {
+            if (tag == null) throw;
+            return null;   // langue non supportee -> essayer le systeme
+        }
+
+        _recognizer = rec;
+        try
+        {
+            await rec.CompileConstraintsAsync();
+            return await rec.RecognizeAsync();
+        }
+        finally
+        {
+            _recognizer = null;
+            rec.Dispose();
         }
     }
 
