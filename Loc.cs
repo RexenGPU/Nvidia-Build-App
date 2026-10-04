@@ -93,6 +93,15 @@ internal static class Loc
             ["es"] = "Fallo de reconocimiento de voz: ", ["de"] = "Spracherkennung fehlgeschlagen: ",
             ["it"] = "Riconoscimento vocale non riuscito: ", ["pt"] = "Falha no reconhecimento de fala: ",
         },
+        ["sttLangMissing"] = new()
+        {
+            ["fr"] = "Aucun moteur de reconnaissance vocale installé sur Windows — installez-en un dans Paramètres > Heure et langue > Voix",
+            ["en"] = "No speech recognition engine installed on Windows — add one in Settings > Time and language > Speech",
+            ["es"] = "No hay ningún motor de reconocimiento de voz instalado en Windows - instala uno en Configuración > Hora e idioma > Voz",
+            ["de"] = "Keine Spracherkennung unter Windows installiert - füge eine unter Einstellungen > Zeit und Sprache > Sprache hinzu",
+            ["it"] = "Nessun motore di riconoscimento vocale installato su Windows - aggiungine uno in Impostazioni > Ora e lingua > Voce",
+            ["pt"] = "Nenhum motor de reconhecimento de fala instalado no Windows - adicione um em Configurações > Hora e idioma > Fala",
+        },
         ["errNoVision"] = new()
         {
             ["fr"] = "Ce modèle ne gère pas les images. Choisissez un modèle vision (Kimi K3, Muse Glimmer, Nemotron Omni, DeepSeek V4.1 Flash, GLM-5.3 Flash) avec /model.",
