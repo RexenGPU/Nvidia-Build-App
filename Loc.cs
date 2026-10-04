@@ -87,6 +87,11 @@ internal static class Loc
             ["fr"] = "Aucune parole détectée", ["en"] = "No speech detected", ["es"] = "No se detectó voz",
             ["de"] = "Keine Sprache erkannt", ["it"] = "Nessuna voce rilevata", ["pt"] = "Nenhuma fala detectada",
         },
+        ["sttProc"] = new()
+        {
+            ["fr"] = "Transcription…", ["en"] = "Transcribing…", ["es"] = "Transcribiendo…",
+            ["de"] = "Transkribierung…", ["it"] = "Trascrizione…", ["pt"] = "Transcrevendo…",
+        },
         ["sttErr"] = new()
         {
             ["fr"] = "Échec de la reconnaissance vocale : ", ["en"] = "Speech recognition failed: ",

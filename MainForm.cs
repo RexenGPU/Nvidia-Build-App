@@ -245,7 +245,6 @@ class MainForm : Form
             case "dictateStop":
                 _dictationCancelled = true;
                 try { _capture?.StopRecording(); } catch { }
-                try { _capture?.Dispose(); } catch { }
                 break;
             case "setMic":
                 Store.Settings.MicDeviceId = string.IsNullOrWhiteSpace(root.GetProperty("id").GetString()) ? null : root.GetProperty("id").GetString();
@@ -901,10 +900,209 @@ class MainForm : Form
         }
     }
 
-    // ---------------------------------------------------------------- dictee vocale (micro choisi + SAPI Windows, offline)
+    // ------------------------------------------------ dictee vocale : enregistrer puis transcrire
+    // (le flux bloquant SAPI se bloque : on enregistre via WASAPI le micro choisi,
+    //  on ecrit un WAV temporaire puis SAPI transcrit le fichier — teste et valide)
 
     NAudio.CoreAudioApi.WasapiCapture? _capture;
+    readonly object _dictLock = new();
+    List<float> _dictMono = new();
+    bool _speechDetected;
+    bool _dictating;
     bool _dictationCancelled;
+    double _minRms = 1.0;
+    long _dictStartTick, _lastSpeechTick;
+
+    async Task StartDictationAsync()
+    {
+        if (_dictating) return;
+        _dictating = true;
+        _dictationCancelled = false;
+        var wavPath = "";
+        try
+        {
+            RunJs("window.api.micState(true)");
+            RunJs($"window.api.setStatus({J(Loc.S("listen"))})");
+
+            wavPath = await RecordDictationAsync();
+
+            if (_dictationCancelled) { PushStatus(); return; }
+            if (!_speechDetected) { RunJs($"window.api.setStatus({J(Loc.S("sttEmpty"))})"); return; }
+
+            RunJs($"window.api.setStatus({J(Loc.S("sttProc"))})");
+            var text = await Task.Run(() => TranscribeWav(wavPath));
+            wavPath = "";
+
+            if (_dictationCancelled) { PushStatus(); return; }
+            if (!string.IsNullOrWhiteSpace(text))
+                RunJs($"window.api.insertDictation({J(text.Trim())})");
+            else
+                RunJs($"window.api.setStatus({J(Loc.S("sttEmpty"))})");
+        }
+        catch (Exception ex)
+        {
+            if (!_dictationCancelled)
+                RunJs($"window.api.setStatus({J(Loc.S("sttErr") + ex.Message)})");
+        }
+        finally
+        {
+            if (wavPath.Length > 0) try { File.Delete(wavPath); } catch { }
+            RunJs("window.api.micState(false)");
+            _dictating = false;
+        }
+    }
+
+    async Task<string> RecordDictationAsync()
+    {
+        // peripherique choisi dans les Parametres (sinon micro par defaut)
+        NAudio.CoreAudioApi.MMDevice? dev = null;
+        if (!string.IsNullOrWhiteSpace(Store.Settings.MicDeviceId))
+        {
+            try { dev = new NAudio.CoreAudioApi.MMDeviceEnumerator().GetDevice(Store.Settings.MicDeviceId); }
+            catch { }
+        }
+        var capture = dev != null
+            ? new NAudio.CoreAudioApi.WasapiCapture(dev)
+            : new NAudio.CoreAudioApi.WasapiCapture();
+        _capture = capture;
+
+        lock (_dictLock)
+        {
+            _dictMono = new List<float>();
+            _speechDetected = false;
+            _minRms = 1.0;
+        }
+        _dictStartTick = Environment.TickCount64;
+        _lastSpeechTick = _dictStartTick;
+
+        var fmt = capture.WaveFormat;
+        int ch = Math.Max(1, fmt.Channels);
+        bool isFloat = fmt.Encoding == NAudio.Wave.WaveFormatEncoding.IeeeFloat;
+        int bpf = Math.Max(1, (fmt.BitsPerSample / 8) * ch);
+
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        capture.DataAvailable += (s, e) =>
+        {
+            try
+            {
+                if (e.BytesRecorded == 0) return;
+                int frames = e.BytesRecorded / bpf;
+                if (frames == 0) return;
+                double sumSq = 0;
+                lock (_dictLock)
+                {
+                    for (int i = 0; i < frames; i++)
+                    {
+                        double acc = 0;
+                        for (int c = 0; c < ch; c++)
+                            acc += isFloat
+                                ? BitConverter.ToSingle(e.Buffer, i * bpf + c * 4)
+                                : (fmt.BitsPerSample == 16
+                                    ? BitConverter.ToInt16(e.Buffer, i * bpf + c * 2) / 32768.0
+                                    : 0.0);
+                        var v = acc / ch;
+                        _dictMono.Add((float)v);
+                        sumSq += v * v;
+                    }
+                }
+                double rms = Math.Sqrt(sumSq / frames);
+
+                long now = Environment.TickCount64;
+                lock (_dictLock)
+                {
+                    _minRms = Math.Min(_minRms, rms);
+                    double threshold = Math.Max(0.012, _minRms * 3.0);
+                    if (rms > threshold)
+                    {
+                        _speechDetected = true;
+                        _lastSpeechTick = now;
+                    }
+                }
+
+                bool spoke;
+                lock (_dictLock) spoke = _speechDetected;
+                // auto-stop : 1,6 s de silence apres la parole / 9 s sans parole / cap 45 s
+                if ((spoke && now - _lastSpeechTick > 1600) || (!spoke && now - _dictStartTick > 9000)
+                    || now - _dictStartTick > 45000)
+                {
+                    try { capture.StopRecording(); } catch { }
+                }
+            }
+            catch { }
+        };
+        capture.RecordingStopped += (s, e) => stopped.TrySetResult(true);
+
+        capture.StartRecording();
+        await stopped.Task;
+
+        try { capture.Dispose(); } catch { }
+        _capture = null;
+
+        // WAV 16 kHz mono 16 bits (resampling lineaire)
+        List<float> mono;
+        bool speech;
+        lock (_dictLock) { mono = _dictMono; speech = _speechDetected; }
+        _speechDetected = speech;
+
+        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NvidiaBuildApp");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "dictation.wav");
+        using (var fs = File.Create(path))
+        using (var w = new BinaryWriter(fs))
+        {
+            double step = fmt.SampleRate / 16000.0;
+            var pcm = new List<byte>(mono.Count * 2 / 3 + 44);
+            double pos = 0;
+            while (pos + 1 < mono.Count)
+            {
+                int i0 = (int)Math.Floor(pos);
+                double frac = pos - i0;
+                float v = mono[i0] + (mono[i0 + 1] - mono[i0]) * (float)frac;
+                short s16 = (short)Math.Clamp(v * 32767f, short.MinValue, short.MaxValue);
+                pcm.Add((byte)(s16 & 0xFF));
+                pcm.Add((byte)((s16 >> 8) & 0xFF));
+                pos += step;
+            }
+            byte[] a = System.Text.Encoding.ASCII.GetBytes("RIFF");
+            byte[] b = System.Text.Encoding.ASCII.GetBytes("WAVE");
+            byte[] f = System.Text.Encoding.ASCII.GetBytes("fmt ");
+            byte[] d = System.Text.Encoding.ASCII.GetBytes("data");
+            w.Write(a); w.Write(36 + pcm.Count); w.Write(b);
+            w.Write(f); w.Write(16); w.Write((short)1); w.Write((short)1);
+            w.Write(16000); w.Write(32000); w.Write((short)2); w.Write((short)16);
+            w.Write(d); w.Write(pcm.Count); w.Write(pcm.ToArray());
+        }
+        return path;
+    }
+
+    string? TranscribeWav(string path)
+    {
+        try
+        {
+            var recs = System.Speech.Recognition.SpeechRecognitionEngine.InstalledRecognizers();
+            if (recs.Count == 0) throw new InvalidOperationException(Loc.S("sttLangMissing"));
+
+            var tag = Loc.L switch
+            {
+                "fr" => "fr-FR", "en" => "en-US", "es" => "es-ES",
+                "de" => "de-DE", "it" => "it-IT", _ => "pt-BR",
+            };
+            var ri = recs.FirstOrDefault(r => string.Equals(r.Culture.Name, tag, StringComparison.OrdinalIgnoreCase))
+                     ?? recs[0];
+
+            using var engine = new System.Speech.Recognition.SpeechRecognitionEngine(ri);
+            engine.LoadGrammar(new System.Speech.Recognition.DictationGrammar());
+            engine.SetInputToWaveFile(path);
+            var result = engine.Recognize(TimeSpan.FromSeconds(60));
+            return result?.Text;
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+
 
     static List<object> EnumerateMics()
     {
@@ -918,226 +1116,6 @@ class MainForm : Form
         }
         catch { }
         return list;
-    }
-
-    async Task StartDictationAsync()
-    {
-        _dictationCancelled = false;
-        try
-        {
-            RunJs("window.api.micState(true)");
-            RunJs($"window.api.setStatus({J(Loc.S("listen"))})");
-
-            var text = await Task.Run(DictateSync);
-
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                RunJs($"window.api.insertDictation({J(text.Trim())})");
-            }
-            else if (!_dictationCancelled)
-            {
-                RunJs($"window.api.setStatus({J(Loc.S("sttEmpty"))})");
-            }
-        }
-        catch (Exception ex)
-        {
-            if (!_dictationCancelled)
-                RunJs($"window.api.setStatus({J(Loc.S("sttErr") + ex.Message)})");
-        }
-        finally
-        {
-            RunJs("window.api.micState(false)");
-            if (_dictationCancelled) PushStatus();
-        }
-    }
-
-    /// <summary>Capture le micro choisi (WASAPI) et le reconnait via le moteur SAPI Windows installe.</summary>
-    string? DictateSync()
-    {
-        // langue de reconnaissance : langue de l'UI, sinon systeme
-        var tag = Loc.L switch
-        {
-            "fr" => "fr-FR", "en" => "en-US", "es" => "es-ES",
-            "de" => "de-DE", "it" => "it-IT", _ => "pt-BR",
-        };
-        var recognizers = System.Speech.Recognition.SpeechRecognitionEngine.InstalledRecognizers();
-        if (recognizers.Count == 0)
-            throw new InvalidOperationException(Loc.S("sttLangMissing"));
-        var ri = recognizers.FirstOrDefault(r => string.Equals(r.Culture.Name, tag, StringComparison.OrdinalIgnoreCase))
-                 ?? recognizers.FirstOrDefault();
-
-        // peripherique de capture
-        NAudio.CoreAudioApi.MMDevice? dev = null;
-        if (!string.IsNullOrWhiteSpace(Store.Settings.MicDeviceId))
-        {
-            try
-            {
-                dev = new NAudio.CoreAudioApi.MMDeviceEnumerator()
-                    .GetDevice(Store.Settings.MicDeviceId);
-            }
-            catch { dev = null; }
-        }
-        using var capture = dev != null
-            ? new NAudio.CoreAudioApi.WasapiCapture(dev)
-            : new NAudio.CoreAudioApi.WasapiCapture();
-        _capture = capture;
-
-        using var pipe = new Pcm16kPipe(capture);
-        capture.DataAvailable += pipe.OnData;
-        capture.RecordingStopped += (s, e) => pipe.Complete();
-
-        using var engine = new System.Speech.Recognition.SpeechRecognitionEngine(ri!);
-        engine.LoadGrammar(new System.Speech.Recognition.DictationGrammar());
-        engine.InitialSilenceTimeout = TimeSpan.FromSeconds(10);
-        engine.BabbleTimeout = TimeSpan.FromSeconds(4);
-        engine.EndSilenceTimeout = TimeSpan.FromSeconds(1.4);
-        engine.SetInputToAudioStream(pipe, new System.Speech.AudioFormat.SpeechAudioFormatInfo(
-            16000, System.Speech.AudioFormat.AudioBitsPerSample.Sixteen, System.Speech.AudioFormat.AudioChannel.Mono));
-
-        try
-        {
-            capture.StartRecording();
-            var result = engine.Recognize(TimeSpan.FromSeconds(90));
-            return result?.Text;
-        }
-        finally
-        {
-            try { capture.StopRecording(); } catch { }
-            pipe.Complete();
-        }
-    }
-
-    /// <summary>Convertit le flux WASAPI (float32, mix) en PCM 16k mono 16 bits en streaming.</summary>
-    class Pcm16kPipe : Stream
-    {
-        readonly NAudio.CoreAudioApi.WasapiCapture _capture;
-        readonly System.Collections.Concurrent.ConcurrentQueue<byte[]> _q = new();
-        readonly SemaphoreSlim _sem = new(0);
-        readonly System.Collections.Generic.List<float> _window = new();
-        double _resamplePos;
-        bool _complete;
-        byte[]? _cur;
-        int _curOfs;
-        long _written;
-
-        public Pcm16kPipe(NAudio.CoreAudioApi.WasapiCapture capture) => _capture = capture;
-
-        public void OnData(object? sender, NAudio.Wave.WaveInEventArgs e)
-        {
-            if (e.BytesRecorded == 0) return;
-            try
-            {
-                var fmt = _capture.WaveFormat;
-                int ch = Math.Max(1, fmt.Channels);
-                int bytesPerFrame = 4 * ch;
-                int frames = e.BytesRecorded / bytesPerFrame;
-                if (frames == 0) return;
-
-                // mixage des canaux -> mono float
-                int baseIdx = _window.Count;
-                for (int i = 0; i < frames; i++)
-                {
-                    double acc = 0;
-                    for (int c = 0; c < ch; c++)
-                        acc += BitConverter.ToSingle(e.Buffer, i * bytesPerFrame + c * 4);
-                    _window.Add((float)(acc / ch));
-                }
-
-                // resampling lineaire vers 16 kHz
-                double step = fmt.SampleRate / 16000.0;
-                while (_resamplePos + 1 < _window.Count)
-                {
-                    double i0 = Math.Floor(_resamplePos);
-                    double frac = _resamplePos - i0;
-                    float s0 = _window[(int)i0];
-                    float s1 = _window[(int)i0 + 1];
-                    float v = s0 + (s1 - s0) * (float)frac;
-                    short pcm = (short)Math.Clamp(v * 32767f, short.MinValue, short.MaxValue);
-                    WriteShort(pcm);
-                    _resamplePos += step;
-                }
-
-                // conserver la fenetre sous controle memoire
-                int consumed = (int)Math.Floor(_resamplePos) - 4000;
-                if (consumed > 0)
-                {
-                    _window.RemoveRange(0, consumed);
-                    _resamplePos -= consumed;
-                }
-            }
-            catch { }
-        }
-
-        void WriteShort(short v)
-        {
-            if (_cur == null || _curOfs + 2 > _cur.Length)
-            {
-                if (_cur != null && _curOfs > 0) Enqueue(_cur, _curOfs);
-                _cur = new byte[2048];
-                _curOfs = 0;
-            }
-            _cur[_curOfs++] = (byte)(v & 0xFF);
-            _cur[_curOfs++] = (byte)((v >> 8) & 0xFF);
-        }
-
-        void Enqueue(byte[] buf, int len)
-        {
-            var copy = new byte[len];
-            Array.Copy(buf, copy, len);
-            _q.Enqueue(copy);
-            _written += len;
-            _sem.Release();
-        }
-
-        public void Complete()
-        {
-            if (_cur != null && _curOfs > 0) { Enqueue(_cur, _curOfs); _cur = null; _curOfs = 0; }
-            _complete = true;
-            _sem.Release();
-        }
-
-        public override bool CanRead => true;
-        public override bool CanSeek => false;
-        public override bool CanWrite => false;
-        public override long Length => _written;
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-        public override void Flush() { }
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            int total = 0;
-            while (total < count)
-            {
-                if (_cur != null && _curOfs < _cur.Length)
-                {
-                    int take = Math.Min(_cur.Length - _curOfs, count - total);
-                    Array.Copy(_cur, _curOfs, buffer, offset + total, take);
-                    _curOfs += take;
-                    total += take;
-                    continue;
-                }
-                _cur = null;
-                if (_q.TryDequeue(out var chunk))
-                {
-                    int take = Math.Min(chunk.Length, count - total);
-                    Array.Copy(chunk, 0, buffer, offset + total, take);
-                    total += take;
-                    if (take < chunk.Length)
-                    {
-                        var rest = new byte[chunk.Length - take];
-                        Array.Copy(chunk, take, rest, 0, rest.Length);
-                        // remettre le reste au debut : copie dans _cur reutilise
-                        _cur = rest; _curOfs = 0;
-                    }
-                    continue;
-                }
-                if (_complete) break;
-                _sem.Wait(150);
-            }
-            return total;
-        }
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     void OnClosingAll()
