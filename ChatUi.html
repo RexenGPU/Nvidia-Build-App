@@ -215,6 +215,17 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 .ctx-item:hover{background:#2e2e2e}
 .ctx-item.danger:hover{background:#3a2222;color:#ff7b72}
 .ctx-sep{height:1px;background:var(--border);margin:4px 8px}
+.convo-empty{color:#555;font-size:12.5px;padding:14px 10px;text-align:center}
+
+/* chevron anime des panneaux repliables (raisonnement / outils) */
+.reasoning summary{list-style:none}
+.reasoning summary::-webkit-details-marker{display:none}
+.reasoning summary::before{content:"";display:inline-block;width:7px;height:7px;
+  border:solid var(--dim);border-width:0 2px 2px 0;transform:rotate(-45deg);margin-right:9px;
+  vertical-align:1px;transition:transform .15s}
+.reasoning[open] summary::before{transform:rotate(45deg)}
+.msg-user .bubble{transition:background .15s}
+.msg-user:hover .bubble{background:#333}
 
 /* polish : filtre picker, animations subtiles */
 #picker-filter{width:calc(100% - 20px);margin:0 10px 10px;background:#262626;border:1px solid var(--border);
@@ -324,7 +335,7 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v2.8</div>
+    <div id="sb-version">NVIDIA Build App · v2.9</div>
   </div>
 </div>
 
@@ -548,7 +559,7 @@ const I18N = {
 fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation…', settings:'Paramètres',
   welcomeTitle:'Comment puis-je vous aider ?', welcomeSub:'Choisissez un modèle, écrivez votre message, ou commencez avec une suggestion.',
   chips:['Explique-moi les transformers simplement','Écris une fonction Python qui inverse une chaîne','Donne-moi 5 idées de projets avec l\'IA','Résume le concept de RAG en 5 points'],
-  inputPh:'Envoyez un message… /model pour changer de modèle', send:'Envoyer', stop:'Arrêter', attTitle:'Joindre une image', micTitle:'Dicter', secMic:'Micro (dictée)', micDefault:'(Par défaut)',
+  inputPh:'Envoyez un message… /model pour changer de modèle', send:'Envoyer', stop:'Arrêter', attTitle:'Joindre une image', micTitle:'Dicter', secMic:'Micro (dictée)', micDefault:'(Par défaut)', modelTitle:'Changer de modèle (ou tapez /model)', searchNone:'Aucun résultat', noConvos:'Aucune conversation pour le moment',
   footerHint:'Entrée = envoyer · Maj+Entrée = nouvelle ligne · /model = modèle · /aide = aide · Échap = arrêter/fermer',
   bannerText:'Clé API manquante — gratuite sur build.nvidia.com. Ouvrez les Paramètres pour la configurer.', bannerBtn:'Configurer',
   pickerTitle:'Choisir le modèle', pickerHint:'↑ ↓ naviguer · Entrée choisir · Échap fermer', pickerFilterPh:'Filtrer les modèles…',
@@ -579,7 +590,7 @@ fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation�
 en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settings:'Settings',
   welcomeTitle:'How can I help you?', welcomeSub:'Pick a model, type your message, or start with a suggestion.',
   chips:['Explain transformers to me simply','Write a Python function that reverses a string','Give me 5 AI project ideas','Summarize the RAG concept in 5 points'],
-  inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop', attTitle:'Attach an image', micTitle:'Dictate', secMic:'Microphone (dictation)', micDefault:'(Default)',
+  inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop', attTitle:'Attach an image', micTitle:'Dictate', secMic:'Microphone (dictation)', micDefault:'(Default)', modelTitle:'Change model (or type /model)', searchNone:'No result', noConvos:'No conversation yet',
   footerHint:'Enter = send · Shift+Enter = new line · /model = pick model · /help = help · Esc = stop/close',
   bannerText:'Missing API key — free on build.nvidia.com. Open Settings to configure it.', bannerBtn:'Configure',
   pickerTitle:'Choose a model', pickerHint:'↑ ↓ navigate · Enter select · Esc close', pickerFilterPh:'Filter models…',
@@ -609,7 +620,7 @@ en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settin
 es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', settings:'Ajustes',
   welcomeTitle:'¿En qué puedo ayudarte?', welcomeSub:'Elige un modelo, escribe tu mensaje o empieza con una sugerencia.',
   chips:['Explícame los transformers de forma simple','Escribe una función Python que invierta una cadena','Dame 5 ideas de proyectos con IA','Resume el concepto de RAG en 5 puntos'],
-  inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener', attTitle:'Adjuntar una imagen', micTitle:'Dictar', secMic:'Micrófono (dictado)', micDefault:'(Predeterminado)',
+  inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener', attTitle:'Adjuntar una imagen', micTitle:'Dictar', secMic:'Micrófono (dictado)', micDefault:'(Predeterminado)', modelTitle:'Cambiar de modelo (o escribe /model)', searchNone:'Sin resultados', noConvos:'Todavía no hay conversaciones',
   footerHint:'Intro = enviar · Mayús+Intro = nueva línea · /model = modelo · /help = ayuda · Esc = detener/cerrar',
   bannerText:'Falta la clave API — gratis en build.nvidia.com. Abre los Ajustes para configurarla.', bannerBtn:'Configurar',
   pickerTitle:'Elegir modelo', pickerHint:'↑ ↓ navegar · Intro elegir · Esc cerrar', pickerFilterPh:'Filtrar modelos…',
@@ -639,7 +650,7 @@ es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', 
 de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:'Einstellungen',
   welcomeTitle:'Wie kann ich helfen?', welcomeSub:'Wähle ein Modell, schreibe deine Nachricht oder starte mit einem Vorschlag.',
   chips:['Erkläre mir Transformer einfach','Schreibe eine Python-Funktion, die einen String umdreht','Gib mir 5 KI-Projektideen','Fasse das Konzept RAG in 5 Punkten zusammen'],
-  inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp', attTitle:'Bild anhängen', micTitle:'Diktieren', secMic:'Mikrofon (Diktat)', micDefault:'(Standard)',
+  inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp', attTitle:'Bild anhängen', micTitle:'Diktieren', secMic:'Mikrofon (Diktat)', micDefault:'(Standard)', modelTitle:'Modell wechseln (oder /model tippen)', searchNone:'Keine Ergebnisse', noConvos:'Noch keine Unterhaltung',
   footerHint:'Enter = senden · Umschalt+Enter = neue Zeile · /model = Modell · /help = Hilfe · Esc = stoppen/schließen',
   bannerText:'API-Schlüssel fehlt — kostenlos auf build.nvidia.com. Öffne die Einstellungen.', bannerBtn:'Konfigurieren',
   pickerTitle:'Modell wählen', pickerHint:'↑ ↓ navigieren · Enter wählen · Esc schließen', pickerFilterPh:'Modelle filtern…',
@@ -669,7 +680,7 @@ de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:
 it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', settings:'Impostazioni',
   welcomeTitle:'Come posso aiutarti?', welcomeSub:'Scegli un modello, scrivi il messaggio o parti da un suggerimento.',
   chips:['Spiegami i transformer in modo semplice','Scrivi una funzione Python che inverte una stringa','Dammi 5 idee di progetti con l\'IA','Riassumi il concetto di RAG in 5 punti'],
-  inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma', attTitle:'Allega un\'immagine', micTitle:'Dettare', secMic:'Microfono (dettatura)', micDefault:'(Predefinito)',
+  inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma', attTitle:'Allega un\'immagine', micTitle:'Dettare', secMic:'Microfono (dettatura)', micDefault:'(Predefinito)', modelTitle:'Cambia modello (o digita /model)', searchNone:'Nessun risultato', noConvos:'Ancora nessuna conversazione',
   footerHint:'Invio = invia · Maiusc+Invio = nuova riga · /model = modello · /help = aiuto · Esc = ferma/chiudi',
   bannerText:'Chiave API mancante — gratuita su build.nvidia.com. Apri le Impostazioni.', bannerBtn:'Configura',
   pickerTitle:'Scegli il modello', pickerHint:'↑ ↓ naviga · Invio scegli · Esc chiudi', pickerFilterPh:'Filtra i modelli…',
@@ -699,7 +710,7 @@ it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', s
 pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings:'Configurações',
   welcomeTitle:'Como posso ajudar?', welcomeSub:'Escolha um modelo, escreva sua mensagem ou comece com uma sugestão.',
   chips:['Explique os transformers de forma simples','Escreva uma função Python que inverta uma string','Dê-me 5 ideias de projetos com IA','Resuma o conceito de RAG em 5 pontos'],
-  inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar', attTitle:'Anexar uma imagem', micTitle:'Ditar', secMic:'Microfone (ditado)', micDefault:'(Padrão)',
+  inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar', attTitle:'Anexar uma imagem', micTitle:'Ditar', secMic:'Microfone (ditado)', micDefault:'(Padrão)', modelTitle:'Trocar modelo (ou digite /model)', searchNone:'Nenhum resultado', noConvos:'Ainda sem conversas',
   footerHint:'Enter = enviar · Shift+Enter = nova linha · /model = modelo · /help = ajuda · Esc = parar/fechar',
   bannerText:'Chave de API ausente — gratuita em build.nvidia.com. Abra as Configurações.', bannerBtn:'Configurar',
   pickerTitle:'Escolher o modelo', pickerHint:'↑ ↓ navegar · Enter escolher · Esc fechar', pickerFilterPh:'Filtrar modelos…',
@@ -765,6 +776,8 @@ function applyI18n(){
   $id('att-btn').title = t('attTitle');
   $id('mic-btn').title = t('micTitle');
   $id('lbl-mic-el').textContent = t('secMic');
+  $id('model-pill').title = t('modelTitle');
+  document.documentElement.lang = state.lang;
 
   $id('mcp-name').placeholder = t('mcpNamePh');
   $id('mcp-opt-local').textContent = t('mcpLocal');
@@ -1013,6 +1026,7 @@ function pickerList(){
 }
 function openPicker(){
   if (!state.models.length) return;
+  if (!$('#key-modal').hidden) closeKeyModal();   // une seule modale a la fois
   $('#picker-filter').value = '';
   renderPicker();
   pickerIdx = Math.max(0, pickerList().indexOf(state.currentModel));
@@ -1236,9 +1250,10 @@ window.api = {
     const sel = document.getElementById('lang-sel');
     if (sel) sel.value = state.lang;
     applyI18n();
+    stopSpeak();
     renderConvoList();
     renderMcpList();
-    rebuildChat();
+    if (!state.busy) rebuildChat();   // ne pas detruire la bulle en cours de generation
     updatePill();
   },
   setBusy(b){
@@ -1365,7 +1380,12 @@ state.streamModel = '';
 function renderConvoList(){
   const q = ($('#convo-search').value || '').trim().toLowerCase();
   const list = state.conversations.filter(c => !q || (c.title || '').toLowerCase().includes(q));
-  $('#convo-list').innerHTML = list.map(c =>
+  const el = $('#convo-list');
+  if (list.length === 0){
+    el.innerHTML = '<div class="convo-empty">' + esc(q ? t('searchNone') : t('noConvos')) + '</div>';
+    return;
+  }
+  el.innerHTML = list.map(c =>
     '<div class="convo' + (c.active ? ' active' : '') + '" data-id="' + esc(c.id) + '">' +
     '<div class="t">' + (c.pinned ? '<span class="pin">📌</span> ' : '') + esc(c.title) + '</div>' +
     '<div class="d">' + esc(c.date) + '</div></div>').join('');
@@ -1389,6 +1409,18 @@ inp.addEventListener('input', autoGrow);
 inp.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); if (!state.busy) doSend(); }
   else if (e.key === 'Escape' && state.busy){ e.stopPropagation(); post('stop'); }
+  else if (e.key === 'ArrowUp' && inp.value === '' && state.messages.length){
+    // rappeler le dernier message envoyé
+    for (let i = state.messages.length - 1; i >= 0; i--){
+      if (state.messages[i].role === 'user'){
+        inp.value = state.messages[i].content || '';
+        autoGrow();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+        e.preventDefault();
+        break;
+      }
+    }
+  }
 });
 
 function doSend(){
@@ -1503,6 +1535,11 @@ $('#wipe-btn').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){
+    if (typeof ctxEl !== 'undefined' && ctxEl) closeCtx();
+    const mic = document.getElementById('mic-btn');
+    if (mic && mic.classList.contains('rec')) post('dictateStop');   // Échap annule la dictée
+  }
   if (!$('#picker').hidden){
     const list = pickerList();
     if (e.key === 'ArrowDown'){ e.preventDefault(); pickerIdx = (pickerIdx + 1) % Math.max(1, list.length); updatePickerAct(); }
