@@ -14,6 +14,17 @@ internal static class Loc
         }
     }
 
+    /// <summary>Culture .NET correspondante (formats de date localises coherents).</summary>
+    public static System.Globalization.CultureInfo Culture => L switch
+    {
+        "fr" => System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
+        "es" => System.Globalization.CultureInfo.GetCultureInfo("es-ES"),
+        "de" => System.Globalization.CultureInfo.GetCultureInfo("de-DE"),
+        "it" => System.Globalization.CultureInfo.GetCultureInfo("it-IT"),
+        "pt" => System.Globalization.CultureInfo.GetCultureInfo("pt-BR"),
+        _ => System.Globalization.CultureInfo.GetCultureInfo("en-US"),
+    };
+
     public static string S(string key)
     {
         if (Dict.TryGetValue(key, out var row) && row.TryGetValue(L, out var v) && !string.IsNullOrEmpty(v))
@@ -177,6 +188,111 @@ internal static class Loc
         {
             ["fr"] = "dd/MM/yyyy HH:mm", ["en"] = "MMM d, yyyy HH:mm", ["es"] = "dd/MM/yyyy HH:mm",
             ["de"] = "dd.MM.yyyy HH:mm", ["it"] = "dd/MM/yyyy HH:mm", ["pt"] = "dd/MM/yyyy HH:mm",
+        },
+        ["alreadyRunning"] = new()
+        {
+            ["fr"] = "NVIDIA Build App est déjà ouverte.", ["en"] = "NVIDIA Build App is already running.",
+            ["es"] = "NVIDIA Build App ya está abierta.", ["de"] = "NVIDIA Build App läuft bereits.",
+            ["it"] = "NVIDIA Build App è già aperta.", ["pt"] = "O NVIDIA Build App já está aberto.",
+        },
+        ["busyStop"] = new()
+        {
+            ["fr"] = "Arrêtez d'abord la génération.", ["en"] = "Stop the current generation first.",
+            ["es"] = "Detén primero la generación.", ["de"] = "Stoppe zuerst die Generierung.",
+            ["it"] = "Ferma prima la generazione.", ["pt"] = "Pare primeiro a geração.",
+        },
+        ["exportUser"] = new()
+        {
+            ["fr"] = "Vous", ["en"] = "You", ["es"] = "Tú", ["de"] = "Du", ["it"] = "Tu", ["pt"] = "Você",
+        },
+        ["newConvoTitle"] = new()
+        {
+            ["fr"] = "Nouvelle conversation", ["en"] = "New conversation", ["es"] = "Nueva conversación",
+            ["de"] = "Neues Gespräch", ["it"] = "Nuova conversazione", ["pt"] = "Nova conversa",
+        },
+        ["imagesTitle"] = new()
+        {
+            ["fr"] = "Images", ["en"] = "Images", ["es"] = "Imágenes", ["de"] = "Bilder",
+            ["it"] = "Immagini", ["pt"] = "Imagens",
+        },
+        ["toolAskTitle"] = new()
+        {
+            ["fr"] = "Autoriser l'outil ?", ["en"] = "Allow tool?", ["es"] = "¿Permitir la herramienta?",
+            ["de"] = "Werkzeug erlauben?", ["it"] = "Consentire lo strumento?", ["pt"] = "Permitir a ferramenta?",
+        },
+        ["toolAskBody"] = new()
+        {
+            ["fr"] = "L'assistant veut exécuter l'outil « {0} » avec les arguments ci-dessous.",
+            ["en"] = "The assistant wants to run the tool \"{0}\" with the arguments below.",
+            ["es"] = "El asistente quiere ejecutar la herramienta «{0}» con los argumentos siguientes.",
+            ["de"] = "Der Assistent möchte das Werkzeug „{0}“ mit den folgenden Argumenten ausführen.",
+            ["it"] = "L'assistente vuole eseguire lo strumento «{0}» con gli argomenti seguenti.",
+            ["pt"] = "O assistente quer executar a ferramenta «{0}» com os argumentos abaixo.",
+        },
+        ["toolAskHint"] = new()
+        {
+            ["fr"] = "« Toujours autoriser » ne vaut que pour cette session.",
+            ["en"] = "\"Always allow\" applies to this session only.",
+            ["es"] = "«Permitir siempre» solo se aplica a esta sesión.",
+            ["de"] = "„Immer erlauben“ gilt nur für diese Sitzung.",
+            ["it"] = "«Consenti sempre» vale solo per questa sessione.",
+            ["pt"] = "«Permitir sempre» vale apenas para esta sessão.",
+        },
+        ["toolAllow"] = new()
+        {
+            ["fr"] = "Autoriser", ["en"] = "Allow", ["es"] = "Permitir", ["de"] = "Erlauben",
+            ["it"] = "Consenti", ["pt"] = "Permitir",
+        },
+        ["toolAlways"] = new()
+        {
+            ["fr"] = "Toujours autoriser", ["en"] = "Always allow", ["es"] = "Permitir siempre",
+            ["de"] = "Immer erlauben", ["it"] = "Consenti sempre", ["pt"] = "Permitir sempre",
+        },
+        ["toolDeny"] = new()
+        {
+            ["fr"] = "Refuser", ["en"] = "Deny", ["es"] = "Denegar", ["de"] = "Ablehnen",
+            ["it"] = "Rifiuta", ["pt"] = "Recusar",
+        },
+        ["toolDenied"] = new()
+        {
+            ["fr"] = "L'utilisateur a refusé l'exécution de cet outil.",
+            ["en"] = "The user denied this tool call.",
+            ["es"] = "El usuario denegó la ejecución de esta herramienta.",
+            ["de"] = "Der Benutzer hat die Ausführung dieses Werkzeugs abgelehnt.",
+            ["it"] = "L'utente ha rifiutato l'esecuzione di questo strumento.",
+            ["pt"] = "O usuário recusou a execução desta ferramenta.",
+        },
+        ["toolError"] = new()
+        {
+            ["fr"] = "Erreur de l'outil : ", ["en"] = "Tool error: ", ["es"] = "Error de la herramienta: ",
+            ["de"] = "Werkzeugfehler: ", ["it"] = "Errore dello strumento: ", ["pt"] = "Erro da ferramenta: ",
+        },
+        ["errAuth"] = new()
+        {
+            ["fr"] = "Clé API invalide ou non autorisée.", ["en"] = "Invalid or unauthorized API key.",
+            ["es"] = "Clave API inválida o no autorizada.", ["de"] = "Ungültiger oder nicht autorisierter API-Schlüssel.",
+            ["it"] = "Chiave API non valida o non autorizzata.", ["pt"] = "Chave de API inválida ou não autorizada.",
+        },
+        ["errRate"] = new()
+        {
+            ["fr"] = "Limite de requêtes atteinte. Réessayez dans un instant.",
+            ["en"] = "Rate limit reached. Try again shortly.",
+            ["es"] = "Límite de solicitudes alcanzado. Inténtalo de nuevo en un momento.",
+            ["de"] = "Anfragelimit erreicht. Versuche es gleich noch einmal.",
+            ["it"] = "Limite di richieste raggiunto. Riprova tra poco.",
+            ["pt"] = "Limite de solicitações atingido. Tente novamente em instantes.",
+        },
+        ["errServer"] = new()
+        {
+            ["fr"] = "Erreur côté serveur NVIDIA.", ["en"] = "NVIDIA server error.",
+            ["es"] = "Error del servidor de NVIDIA.", ["de"] = "Fehler auf dem NVIDIA-Server.",
+            ["it"] = "Errore del server NVIDIA.", ["pt"] = "Erro no servidor da NVIDIA.",
+        },
+        ["errNetwork"] = new()
+        {
+            ["fr"] = "Connexion impossible.", ["en"] = "Connection failed.",
+            ["es"] = "No se pudo conectar.", ["de"] = "Verbindung fehlgeschlagen.",
+            ["it"] = "Connessione non riuscita.", ["pt"] = "Falha na conexão.",
         },
         ["sysPrompt"] = new()
         {

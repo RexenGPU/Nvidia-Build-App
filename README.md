@@ -19,10 +19,21 @@ A ChatGPT-style desktop chat app for Windows, powered by the NVIDIA NIM API ([bu
 - 6 languages: English (default), Fran&ccedil;ais, Espa&ntilde;ol, Deutsch, Italiano, Portugu&ecirc;s — with a first-launch picker
 - Conversation history with search, pin, rename, clear and **export to Markdown**
 - **Vision**: paste, drop or attach images — analyzed by vision models (Kimi K3, Muse Glimmer, Nemotron Omni…), marked with a VISION badge in the picker
-- **Smart auto-title**: the model names each conversation itself after the first exchange
+- **Smart auto-title**: the model names each conversation itself after the first exchange (manual renames are never overwritten)
 - Edit a message and regenerate, copy or delete any message, regenerate any answer
 - Settings: API key, temperature, max tokens, system prompt
 - Single self-contained `.exe` (about 50 MB) — no .NET runtime required
+
+## Security & reliability (3.0)
+
+- **API key encrypted at rest** with Windows DPAPI (and never sent back to the web UI)
+- **Tool-call confirmation**: every MCP tool run asks for permission (Allow once / Always for this session / Deny)
+- **Locked-down UI**: strict CSP + per-launch nonce, HTML/attribute escaping, web links only (http/https) opened in the default browser
+- **Atomic saves** (settings + conversations): a crash can no longer truncate a JSON file
+- **Single instance** per Windows session — no two writers on the same files
+- **Interrupted replies are kept**, with a **Retry** button; partial text is never lost on network errors or 429/5xx
+- Stale models are detected (404) and the list falls back automatically; history trimming never splits a tool call from its result
+- MCP names are normalized (API-safe, case-insensitive, collision-free), connections are thread-safe and cancellable
 
 ## Getting started
 

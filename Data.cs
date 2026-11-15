@@ -170,14 +170,17 @@ public class McpServerConfig
 public class Conversation
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    public string Title { get; set; } = "Nouvelle conversation";
+    public string Title { get; set; } = "New conversation";
     public string? Model { get; set; }
     public bool Pinned { get; set; }
+    public bool TitleLocked { get; set; }      // renommage manuel : ne plus auto-titrer
+    public bool TitleGenerated { get; set; }   // auto-titre deja genere
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public List<ChatMessage> Messages { get; set; } = new();
 
-    [JsonIgnore] public string FilePath => Path.Combine(Store.ConversationsDir, Id + ".json");
+    [JsonIgnore] public string? LoadedFrom { get; set; }
+    [JsonIgnore] public string FilePath => LoadedFrom ?? Path.Combine(Store.ConversationsDir, Id + ".json");
 
     public void Save() => Store.SaveConversation(this);
 
@@ -189,10 +192,18 @@ public class Conversation
 
 public class AppSettings
 {
-    public string ApiKey { get; set; } = "";
+    // Cle chiffree DPAPI. ApiKey reste en memoire et n'est jamais serialise.
+    public string ApiKeyEnc { get; set; } = "";
+
+    [JsonPropertyName("ApiKey")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyApiKey { get; set; }
+
+    [JsonIgnore] public string ApiKey { get; set; } = "";
     public string? LastModel { get; set; }
     public string Lang { get; set; } = "en";
     public bool FirstRun { get; set; } = true;
+    public bool SettingsPrompted { get; set; }
     public string? MicDeviceId { get; set; }   // micro selectionne pour la dictee
     public List<string>? LiveModels { get; set; }   // liste reelle recuperee de l'API (GET /models)
     public float Temperature { get; set; } = 0.7f;
@@ -208,7 +219,15 @@ public static class Store
     public static readonly string ConversationsDir = Path.Combine(Dir, "conversations");
     public static readonly string SettingsPath = Path.Combine(Dir, "settings.json");
 
-    static readonly JsonSerializerOptions JOpt = new() { WriteIndented = true };
+    static readonly JsonSerializerOptions JOpt = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    static readonly JsonSerializerOptions ConvOpt = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     public static AppSettings Settings { get; private set; } = new();
 
@@ -217,6 +236,23 @@ public static class Store
         Directory.CreateDirectory(Dir);
         Directory.CreateDirectory(ConversationsDir);
         LoadSettings();
+    }
+
+    /// <summary>Ecriture atomique : un crash ne laisse jamais un JSON tronque.</summary>
+    static void WriteAtomic(string path, string content)
+    {
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        var tmp = path + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp";
+        try
+        {
+            File.WriteAllText(tmp, content, new System.Text.UTF8Encoding(false));
+            File.Move(tmp, path, overwrite: true);
+        }
+        finally
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+        }
     }
 
     public static void LoadSettings()
@@ -229,11 +265,59 @@ public static class Store
                 Settings = new AppSettings();
         }
         catch { Settings = new AppSettings(); }
+
+        // migration depuis l'ancien stockage en clair
+        if (!string.IsNullOrEmpty(Settings.ApiKeyEnc))
+        {
+            var decrypted = Secret.Unprotect(Settings.ApiKeyEnc);
+            if (decrypted != null)
+            {
+                Settings.ApiKey = decrypted;
+            }
+            else if (!string.IsNullOrEmpty(Settings.LegacyApiKey))
+            {
+                // DPAPI a echoue mais l'ancienne valeur en clair est encore la : on la re-chiffre
+                Settings.ApiKey = Settings.LegacyApiKey!;
+                var enc = Secret.Protect(Settings.ApiKey);
+                if (enc != null)
+                {
+                    Settings.ApiKeyEnc = enc;
+                    Settings.LegacyApiKey = null;
+                    SaveSettings();
+                }
+            }
+        }
+        else if (!string.IsNullOrEmpty(Settings.LegacyApiKey))
+        {
+            Settings.ApiKey = Settings.LegacyApiKey!;
+            var enc = Secret.Protect(Settings.ApiKey);
+            if (enc != null)
+            {
+                Settings.ApiKeyEnc = enc;
+                Settings.LegacyApiKey = null;
+                SaveSettings();
+            }
+        }
     }
 
     public static void SaveSettings()
     {
-        try { File.WriteAllText(SettingsPath, JsonSerializer.Serialize(Settings, JOpt)); } catch { }
+        try
+        {
+            if (!string.IsNullOrEmpty(Settings.ApiKey))
+            {
+                var enc = Secret.Protect(Settings.ApiKey);
+                Settings.ApiKeyEnc = enc ?? "";
+                Settings.LegacyApiKey = enc == null ? Settings.ApiKey : null;   // repli si DPAPI indisponible
+            }
+            else
+            {
+                Settings.ApiKeyEnc = "";
+                Settings.LegacyApiKey = null;
+            }
+            WriteAtomic(SettingsPath, JsonSerializer.Serialize(Settings, JOpt));
+        }
+        catch { }
     }
 
     public static void SaveConversation(Conversation c)
@@ -241,7 +325,9 @@ public static class Store
         try
         {
             c.UpdatedAt = DateTime.Now;
-            File.WriteAllText(c.FilePath, JsonSerializer.Serialize(c, JOpt));
+            var path = c.FilePath;
+            WriteAtomic(path, JsonSerializer.Serialize(c, ConvOpt));
+            c.LoadedFrom = path;
         }
         catch { }
     }
@@ -255,8 +341,12 @@ public static class Store
             {
                 try
                 {
-                    var c = JsonSerializer.Deserialize<Conversation>(File.ReadAllText(f), JOpt);
-                    if (c != null) list.Add(c);
+                    var c = JsonSerializer.Deserialize<Conversation>(File.ReadAllText(f), ConvOpt);
+                    if (c == null) continue;
+                    if (!IsValidId(c.Id) || list.Any(x => x.Id == c.Id))
+                        c.Id = Guid.NewGuid().ToString("N");
+                    c.LoadedFrom = f;
+                    list.Add(c);
                 }
                 catch { }
             }
@@ -264,6 +354,9 @@ public static class Store
         catch { }
         return list.OrderByDescending(c => c.UpdatedAt).ToList();
     }
+
+    static bool IsValidId(string? id) =>
+        id is { Length: 32 } && id.All(ch => (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'));
 
     public static void DeleteConversation(Conversation c)
     {

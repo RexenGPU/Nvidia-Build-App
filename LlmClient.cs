@@ -35,17 +35,24 @@ public static class LlmClient
         if (!string.IsNullOrWhiteSpace(systemPrompt))
             msgs.Add(new JsonObject { ["role"] = "system", ["content"] = systemPrompt });
 
-        foreach (var m in messages)
+        // une seule serie d'images (le dernier message qui en contient) est renvoyee :
+        // evite de re-transmettre toutes les images de l'historique a chaque tour.
+        int lastImageIndex = -1;
+        for (int i = 0; i < messages.Count; i++)
+            if (messages[i].Images is { Count: > 0 }) lastImageIndex = i;
+
+        for (int mi = 0; mi < messages.Count; mi++)
         {
+            var m = messages[mi];
             var o = new JsonObject { ["role"] = m.Role };
-            if (m.Role == "tool" && !string.IsNullOrEmpty(m.ToolCallId))
+            if (m.Role == "tool")
             {
-                o["tool_call_id"] = m.ToolCallId;
+                o["tool_call_id"] = m.ToolCallId ?? "";
                 o["content"] = m.Content;
             }
             else if (m.ToolCalls is { Count: > 0 })
             {
-                if (!string.IsNullOrEmpty(m.Content)) o["content"] = m.Content;
+                o["content"] = string.IsNullOrEmpty(m.Content) ? null : m.Content;
                 var tcs = new JsonArray();
                 foreach (var tc in m.ToolCalls)
                     tcs.Add(new JsonObject
@@ -56,7 +63,7 @@ public static class LlmClient
                     });
                 o["tool_calls"] = tcs;
             }
-            else if (m.Images is { Count: > 0 })
+            else if (m.Images is { Count: > 0 } && mi == lastImageIndex)
             {
                 // contenu multimodal : texte + images (dataUrls)
                 var parts = new JsonArray();

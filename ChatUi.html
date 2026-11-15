@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'nonce-{{NONCE}}'; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>NVIDIA Build App</title>
 <style>
 :root{
@@ -74,7 +75,7 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 .welcome p{color:var(--dim);font-size:14px;margin:12px 0 30px}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:620px;margin:0 auto}
 .chip{border:1px solid var(--border);background:var(--card);border-radius:14px;padding:15px 16px;
-  font-size:13px;cursor:pointer;transition:.15s;text-align:left;color:var(--text)}
+  font-size:13px;cursor:pointer;transition:.15s;text-align:left;color:var(--text);font-family:inherit}
 .chip:hover{border-color:var(--green);background:#262626}
 
 /* messages */
@@ -99,6 +100,8 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 .md h3{font-size:19px}.md h4{font-size:17px}.md h5{font-size:15.5px}.md h6{font-size:14.5px;color:var(--dim)}
 .md ul,.md ol{margin:0 0 13px 22px}
 .md li{margin-bottom:6px}
+.md li>ul,.md li>ol{margin:6px 0 4px 20px}
+.md li>ul>li,.md li>ol>li{margin-bottom:3px}
 .md hr{border:none;border-top:1px solid var(--border);margin:16px 0}
 .md blockquote{border-left:3px solid var(--green);padding:2px 0 2px 14px;color:var(--dim);margin:12px 0}
 .md blockquote p{margin:0}
@@ -137,6 +140,9 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 .error-card{border:1px solid #5a2a2a;background:#231616;color:#ff7b72;border-radius:13px;
   padding:14px 16px;font-size:14px;line-height:1.55}
 .error-card b{display:block;margin-bottom:4px;letter-spacing:.3px}
+.err-retry{margin-top:10px;background:#3a2222;border:1px solid #5a2a2a;color:#ffb4ad;border-radius:9px;
+  padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.err-retry:hover{background:#4a2a2a;color:#fff}
 
 /* ---------------- Input ---------------- */
 #input-zone{padding:4px 24px 12px}
@@ -147,7 +153,6 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 #model-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
 #model-pill .dot.busy{animation:dotpulse 1.2s ease-in-out infinite}
 @keyframes dotpulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(118,185,0,.4)}50%{opacity:.4;box-shadow:0 0 0 5px rgba(118,185,0,0)}}
-  color:var(--dim);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;margin-left:8px}
 .act.speaking{color:var(--green-soft)}
 #model-pill .mp-caret{color:var(--dim);font-size:10px}
 #input-card{max-width:860px;margin:0 auto;background:#262626;border:1px solid var(--border);
@@ -266,6 +271,9 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 .s-row label{font-size:12.5px;color:var(--dim);min-width:90px}
 .s-row input[type=range]{flex:1;accent-color:var(--green)}
 .s-row input[type=number]{background:#262626;border:1px solid var(--border);border-radius:9px;color:var(--text);padding:7px 10px;font-size:13px;outline:none;width:110px}
+.s-row select{background:#262626;border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:8px 10px;font-size:12.5px;outline:none;font-family:inherit;flex:1;min-width:0}
+.s-row select:focus{border-color:var(--green)}
 .s-col{display:flex;flex-direction:column;gap:6px}
 .s-col label{font-size:12.5px;color:var(--dim)}
 .s-col textarea{background:#262626;border:1px solid var(--border);border-radius:11px;color:var(--text);
@@ -312,6 +320,10 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 #key-eye{background:none;border:1px solid var(--border);border-radius:11px;color:var(--dim);
   padding:0 13px;cursor:pointer;font-size:12px;font-weight:600}
 #key-eye:hover{color:var(--text)}
+#key-clear{background:none;border:1px solid #5a2a2a;border-radius:11px;color:#ff7b72;
+  padding:0 13px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}
+#key-clear:hover{background:#2a1a1a}
+#key-clear[hidden]{display:none}
 .key-actions{display:flex;gap:10px;justify-content:flex-end}
 #key-cancel{background:#232323;border:1px solid var(--border);color:var(--text);border-radius:11px;
   padding:10px 16px;font-weight:600;font-size:13px;cursor:pointer}
@@ -335,7 +347,7 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
   <input id="convo-search" type="text" placeholder="Rechercher une conversation…">
   <div id="convo-list"></div>
   <div id="sb-footer">
-    <div id="sb-version">NVIDIA Build App · v2.9</div>
+    <div id="sb-version">NVIDIA Build App · v{{VERSION}}</div>
   </div>
 </div>
 
@@ -446,8 +458,10 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
         <div class="key-row">
           <input type="password" id="key-input" placeholder="nvapi-…" spellcheck="false" autocomplete="off">
           <button id="key-eye">afficher</button>
+          <button id="key-clear" hidden>Supprimer la clé</button>
         </div>
-        <p class="s-hint"><span id="kh1">Gratuite sur</span> <a id="key-link">build.nvidia.com</a> <span id="kh2">· commande /cle</span></p>
+        <p class="s-hint" id="key-hint"><span id="kh1">Gratuite sur</span> <a id="key-link">build.nvidia.com</a> <span id="kh2">· commande /cle</span></p>
+        <p class="s-hint" id="key-keep-hint" hidden></p>
       </div>
 
       <div class="s-section">
@@ -497,7 +511,7 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
   </div>
 </div>
 
-<script>
+<script nonce="{{NONCE}}">
 /* rapporteur global (bloc separe : survit aux erreurs de syntaxe du script principal) */
 window.onerror = function(msg, src, line, col){
   try {
@@ -507,12 +521,12 @@ window.onerror = function(msg, src, line, col){
 };
 </script>
 
-<script>
+<script nonce="{{NONCE}}">
 "use strict";
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const chatEl = $('#chat'), inner = $('#chat-inner'), inp = $('#inp');
-const state = { busy:false, pinned:true, messages:[], models:[], currentModel:'', key:'', conversations:[], settings:{}, mcp:[], reasoningOpen:true, lang:'en', pendingImages:[] };
+const state = { busy:false, pinned:true, messages:[], models:[], currentModel:'', hasKey:false, conversations:[], settings:{}, mcp:[], reasoningOpen:true, lang:'en', pendingImages:[] };
 
 function post(t, extra) {
   const o = Object.assign({t}, extra||{});
@@ -521,17 +535,47 @@ function post(t, extra) {
 
 /* echappement HTML sans entites litterales (construites via charCode) */
 const C_A = String.fromCharCode(38), C_L = String.fromCharCode(60), C_G = String.fromCharCode(62);
+const C_Q = String.fromCharCode(34), C_S = String.fromCharCode(39);
 function esc(s){
   if (!s) return '';
+  s = String(s);
   let out = '';
   for (let i = 0; i < s.length; i++){
     const c = s[i];
     if (c === C_A) out += C_A + 'amp;';
     else if (c === C_L) out += C_A + 'lt;';
     else if (c === C_G) out += C_A + 'gt;';
+    else if (c === C_Q) out += C_A + 'quot;';
+    else if (c === C_S) out += C_A + '#39;';
     else out += c;
   }
   return out;
+}
+function escAttr(s){ return esc(s); }
+function unesc(s){
+  return String(s).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+/* seules les URL web sont ouvertes (le host applique la meme regle) */
+function safeUrl(u){
+  if (!u || !/^https?:\/\//i.test(u)) return '';
+  try {
+    const p = new URL(u);
+    return (p.protocol === 'http:' || p.protocol === 'https:') ? p.href : '';
+  } catch { return ''; }
+}
+/* seules les images data: de type image sont injectees dans le DOM */
+function safeImg(u){
+  if (typeof u !== 'string') return '';
+  return /^data:image\/(?:png|jpe?g|gif|webp|bmp);base64,[A-Za-z0-9+/=\s]+$/.test(u) ? u : '';
+}
+function fmtDateTime(iso){
+  try { return new Date(iso).toLocaleString(state.lang, {year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); }
+  catch { return iso || ''; }
+}
+function fmtTime(iso){
+  try { return new Date(iso).toLocaleTimeString(state.lang, {hour:'2-digit', minute:'2-digit'}); }
+  catch { return ''; }
 }
 
 /* noms lisibles des modeles */
@@ -575,6 +619,8 @@ fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation�
   mcpOk:'Connecté · {n} outil(s)', mcpOffS:'Non connecté', mcpErrS:'Erreur', mcpDisabled:'Désactivé',
   wipe:'Effacer toutes les conversations', wipeConfirm:'Confirmer : tout effacer définitivement ?',
   save:'Enregistrer', cancel:'Annuler',
+  retry:'Réessayer', hide:'masquer', clearKey:'Supprimer la clé',
+  keySavedPh:'Clé enregistrée — laisser vide pour la conserver',
   ctxOpen:'Ouvrir', ctxRename:'Renommer', ctxPin:'Épingler', ctxUnpin:'Détacher', ctxExport:'Exporter (.md)', ctxClear:'Effacer les messages', ctxDelete:'Supprimer', ctxConfirmDel:'Confirmer la suppression ?',
   actCopy:'Copier', actRegen:'Régénérer', actDelete:'Supprimer', actEdit:'Éditer', read:'Lire', stopRead:'Arrêter',
   noVoice:'Aucune voix installée pour cette langue — ajoutez-en une dans Windows (Paramètres > Heure et langue > Voix)',
@@ -606,6 +652,8 @@ en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settin
   mcpOk:'Connected · {n} tool(s)', mcpOffS:'Not connected', mcpErrS:'Connection error', mcpDisabled:'Disabled',
   wipe:'Delete all conversations', wipeConfirm:'Confirm: erase everything permanently?',
   save:'Save', cancel:'Cancel',
+  retry:'Retry', hide:'hide', clearKey:'Remove key',
+  keySavedPh:'Key saved — leave empty to keep it',
   ctxOpen:'Open', ctxRename:'Rename', ctxPin:'Pin', ctxUnpin:'Unpin', ctxExport:'Export (.md)', ctxClear:'Clear messages', ctxDelete:'Delete', ctxConfirmDel:'Confirm deletion?',
   actCopy:'Copy', actRegen:'Regenerate', actDelete:'Delete', actEdit:'Edit', read:'Read', stopRead:'Stop', noVoice:'No voice installed for this language - add one in Windows (Settings > Time and language > Speech)',
   editSave:'Save (regenerates)', editCancel:'Cancel',
@@ -636,6 +684,8 @@ es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', 
   mcpOk:'Conectado · {n} herramienta(s)', mcpOffS:'No conectado', mcpErrS:'Error de conexión', mcpDisabled:'Desactivado',
   wipe:'Eliminar todas las conversaciones', wipeConfirm:'Confirmar: ¿borrar todo definitivamente?',
   save:'Guardar', cancel:'Cancelar',
+  retry:'Reintentar', hide:'ocultar', clearKey:'Eliminar la clave',
+  keySavedPh:'Clave guardada — déjala vacía para conservarla',
   ctxOpen:'Abrir', ctxRename:'Renombrar', ctxPin:'Fijar', ctxUnpin:'Quitar fijado', ctxExport:'Exportar (.md)', ctxClear:'Vaciar mensajes', ctxDelete:'Eliminar', ctxConfirmDel:'¿Confirmar eliminación?',
   actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Eliminar', actEdit:'Editar', read:'Leer', stopRead:'Detener', noVoice:'No hay ninguna voz instalada para este idioma - anade una en Windows (Configuracion > Hora e idioma > Voz)',
   editSave:'Guardar (regenera)', editCancel:'Cancelar',
@@ -666,6 +716,8 @@ de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:
   mcpOk:'Verbunden · {n} Werkzeug(e)', mcpOffS:'Nicht verbunden', mcpErrS:'Verbindungsfehler', mcpDisabled:'Deaktiviert',
   wipe:'Alle Unterhaltungen löschen', wipeConfirm:'Bestätigen: endgültig alles löschen?',
   save:'Speichern', cancel:'Abbrechen',
+  retry:'Erneut versuchen', hide:'ausblenden', clearKey:'Schlüssel entfernen',
+  keySavedPh:'Schlüssel gespeichert — leer lassen, um ihn zu behalten',
   ctxOpen:'Öffnen', ctxRename:'Umbenennen', ctxPin:'Anheften', ctxUnpin:'Lösen', ctxExport:'Exportieren (.md)', ctxClear:'Nachrichten leeren', ctxDelete:'Löschen', ctxConfirmDel:'Löschen bestätigen?',
   actCopy:'Kopieren', actRegen:'Neu generieren', actDelete:'Löschen', actEdit:'Bearbeiten', read:'Lesen', stopRead:'Stopp', noVoice:'Keine Stimme für diese Sprache installiert - füge eine in Windows hinzu (Einstellungen > Zeit und Sprache > Sprache)',
   editSave:'Speichern (generiert neu)', editCancel:'Abbrechen',
@@ -696,6 +748,8 @@ it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', s
   mcpOk:'Connesso · {n} strumento(i)', mcpOffS:'Non connesso', mcpErrS:'Errore di connessione', mcpDisabled:'Disattivato',
   wipe:'Elimina tutte le conversazioni', wipeConfirm:'Confermi: cancellare tutto definitivamente?',
   save:'Salva', cancel:'Annulla',
+  retry:'Riprova', hide:'nascondi', clearKey:'Rimuovi la chiave',
+  keySavedPh:'Chiave salvata — lascia vuoto per conservarla',
   ctxOpen:'Apri', ctxRename:'Rinomina', ctxPin:'Fissa', ctxUnpin:'Sblocca', ctxExport:'Esporta (.md)', ctxClear:'Svuota i messaggi', ctxDelete:'Elimina', ctxConfirmDel:'Confermi l\'eliminazione?',
   actCopy:'Copia', actRegen:'Rigenera', actDelete:'Elimina', actEdit:'Modifica', read:'Leggi', stopRead:'Ferma', noVoice:'Nessuna voce installata per questa lingua - aggiungine una in Windows (Impostazioni > Ora e lingua > Voce)',
   editSave:'Salva (rigenera)', editCancel:'Annulla',
@@ -726,6 +780,8 @@ pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings
   mcpOk:'Conectado · {n} ferramenta(s)', mcpOffS:'Não conectado', mcpErrS:'Erro de conexão', mcpDisabled:'Desativado',
   wipe:'Excluir todas as conversas', wipeConfirm:'Confirmar: apagar tudo definitivamente?',
   save:'Salvar', cancel:'Cancelar',
+  retry:'Tentar novamente', hide:'ocultar', clearKey:'Remover a chave',
+  keySavedPh:'Chave salva — deixe vazio para mantê-la',
   ctxOpen:'Abrir', ctxRename:'Renomear', ctxPin:'Fixar', ctxUnpin:'Desafixar', ctxExport:'Exportar (.md)', ctxClear:'Limpar mensagens', ctxDelete:'Excluir', ctxConfirmDel:'Confirmar exclusão?',
   actCopy:'Copiar', actRegen:'Regenerar', actDelete:'Excluir', actEdit:'Editar', read:'Ler', stopRead:'Parar', noVoice:'Nenhuma voz instalada para este idioma - adicione uma no Windows (Configuracoes > Hora e idioma > Fala)',
   editSave:'Salvar (regenera)', editCancel:'Cancelar',
@@ -772,7 +828,10 @@ function applyI18n(){
   $id('lbl-prompt').textContent = t('lblPrompt');
   $id('kh1').textContent = t('kh1');
   $id('kh2').textContent = t('kh2');
-  $id('key-eye').textContent = t('show');
+  $id('key-eye').textContent = $id('key-input').type === 'password' ? t('show') : t('hide');
+  $id('key-clear').textContent = t('clearKey');
+  $id('key-keep-hint').textContent = t('keySavedPh');
+  $id('key-input').placeholder = state.hasKey ? t('keySavedPh') : 'nvapi-…';
   $id('att-btn').title = t('attTitle');
   $id('mic-btn').title = t('micTitle');
   $id('lbl-mic-el').textContent = t('secMic');
@@ -801,7 +860,10 @@ function inline(s){
   out = out.replace(/`([^`]+)`/g,(m,c)=>{codes.push(c);return '\x01'+(codes.length-1)+'\x01';});
   out = out.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
   out = out.replace(/(^|[\s(])\*([^*\n]+)\*/g,'$1<em>$2</em>');
-  out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<a data-href="$2">$1</a>');
+  out = out.replace(/\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))*)\)/g,(m,label,url)=>{
+    const href = safeUrl(unesc(url));
+    return href ? '<a data-href="' + escAttr(href) + '">' + label + '</a>' : label;
+  });
   out = out.replace(/\x01(\d+)\x01/g,(m,i)=>'<code>'+codes[+i]+'</code>');
   return out;
 }
@@ -847,6 +909,37 @@ function renderCode(bl){
     '<pre><code>' + highlight(bl.code, bl.lang) + '</code></pre></div>';
 }
 
+/* listes imbriquees (indentation de 2 espaces ou plus) */
+function parseList(lines, i, baseIndent){
+  const first = lines[i].match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
+  if (!first) return ['', i];
+  const ordered = /^\d/.test(first[2]);
+  let html = ordered ? '<ol>' : '<ul>';
+  while (i < lines.length){
+    const m = lines[i].match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
+    if (!m){
+      if (lines[i].trim() && /^\s{2,}/.test(lines[i]) && /<\/li>$/.test(html)){
+        html = html.slice(0, -5) + '<br>' + inline(lines[i].trim()) + '</li>';
+        i++;
+        continue;
+      }
+      break;
+    }
+    const indent = m[1].length;
+    if (indent < baseIndent) break;
+    if (indent >= baseIndent + 2){
+      const [sub, ni] = parseList(lines, i, indent);
+      html = /<\/li>$/.test(html) ? html.slice(0, -5) + sub + '</li>' : html + sub;
+      i = ni;
+      continue;
+    }
+    html += '<li>' + inline(m[3]) + '</li>';
+    i++;
+  }
+  html += ordered ? '</ol>' : '</ul>';
+  return [html, i];
+}
+
 function mdToHtml(src){
   if (!src) return '';
   const blocks = [];
@@ -871,14 +964,9 @@ function mdToHtml(src){
       const q = [m[1]]; i++;
       while (i < lines.length && (m = lines[i].match(/^>\s?(.*)$/))){ q.push(m[1]); i++; }
       html += '<blockquote><p>' + q.map(inline).join('<br>') + '</p></blockquote>'; continue; }
-    if ((m = line.match(/^[-*+]\s+(.*)$/))){ flush();
-      html += '<ul>';
-      while (i < lines.length && (m = lines[i].match(/^[-*+]\s+(.*)$/))){ html += '<li>' + inline(m[1]) + '</li>'; i++; }
-      html += '</ul>'; continue; }
-    if ((m = line.match(/^\d+[.)]\s+(.*)$/))){ flush();
-      html += '<ol>';
-      while (i < lines.length && (m = lines[i].match(/^\d+[.)]\s+(.*)$/))){ html += '<li>' + inline(m[1]) + '</li>'; i++; }
-      html += '</ol>'; continue; }
+    if ((m = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/))){ flush();
+      const parsed = parseList(lines, i, m[1].length);
+      html += parsed[0]; i = parsed[1]; continue; }
     if (t.includes('|') && i+1 < lines.length && /^[\s|:-]+$/.test(lines[i+1]) && lines[i+1].includes('-')){
       flush();
       const row = l => l.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(c => c.trim());
@@ -898,10 +986,10 @@ function mdToHtml(src){
 const SUGGESTIONS0 = null;  // remplace par getSuggestions()
 
 function welcomeHtml(){
-  return '<div class="welcome"><img src="{{LOGO}}">' +
+  return '<div class="welcome"><img src="{{LOGO}}" alt="">' +
     '<h1>' + esc(t('welcomeTitle')) + '</h1>' +
     '<p>' + esc(t('welcomeSub')) + '</p>' +
-    '<div class="chips">' + getSuggestions().map(s => '<div class="chip">' + esc(s) + '</div>').join('') + '</div></div>';
+    '<div class="chips">' + getSuggestions().map(s => '<button type="button" class="chip">' + esc(s) + '</button>').join('') + '</div></div>';
 }
 
 function reasoningHtml(r, open){
@@ -915,13 +1003,14 @@ function prettyJson(s){
 
 function toolCallsHtml(tc){
   return '<details class="reasoning" open><summary>' + esc(tn('toolUsed', tc.length)) + '</summary>' +
-    tc.map(t2 => '<b>' + esc(t2.name) + '</b>' + (t2.arguments && t2.arguments !== '{}' ?
-      '\n' + esc(prettyJson(t2.arguments)) : '')).join('\n\n') +
-    '</div></details>';
+    '<div class="rbody">' + tc.map(x =>
+      '<div><b>' + esc(x.name) + '</b>' +
+      (x.arguments && x.arguments !== '{}' ? '\n' + esc(prettyJson(x.arguments)) : '') + '</div>'
+    ).join('\n') + '</div></details>';
 }
 
 function toolMessage(o){
-  return '<div class="msg-ai"><img class="avatar" src="{{LOGO}}"><div class="body">' +
+  return '<div class="msg-ai"><img class="avatar" src="{{LOGO}}" alt=""><div class="body">' +
     '<div class="ai-head">' + esc(t('toolHead')) + '&nbsp; <span>' + esc(o.toolName || '') + '</span></div>' +
     '<details class="reasoning"><summary>' + esc(t('toolResult')) + '</summary>' +
     '<div class="rbody">' + esc((o.content || '').slice(0, 6000)) + '</div></details>' +
@@ -943,15 +1032,16 @@ function aiMessage(o, streaming, openOverride){
       '<button class="act" data-act="del" data-idx="' + o.index + '">' + esc(t('actDelete')) + '</button></div>';
   }
   const meta = (o.time || o.elapsed != null) ? '<div class="meta">' +
-    [o.time || '', o.elapsed != null ? Number(o.elapsed).toFixed(1).replace('.', ',') + ' s' : '']
+    [o.time ? fmtTime(o.time) : '', o.elapsed != null ? Number(o.elapsed).toFixed(1).replace('.', ',') + ' s' : '']
       .filter(Boolean).join(' · ') + '</div>' : '';
   return '<div class="msg-ai"><img class="avatar" src="{{LOGO}}"><div class="body">' +
     head + reason + tools + md + actions + meta + '</div></div>';
 }
 
 function userMessage(o){
-  const atts = (o.thumbs && o.thumbs.length)
-    ? '<div class="atts">' + o.thumbs.map(u => '<img class="att-thumb" src="' + u + '">').join('') + '</div>'
+  const thumbs = (o.thumbs || []).map(safeImg).filter(Boolean);
+  const atts = thumbs.length
+    ? '<div class="atts">' + thumbs.map(u => '<img class="att-thumb" src="' + escAttr(u) + '" alt="">').join('') + '</div>'
     : '';
   return '<div class="msg-user"><div style="max-width:72%">' +
     atts +
@@ -960,7 +1050,7 @@ function userMessage(o){
     '<button class="act" data-act="copy" data-idx="' + o.index + '">' + esc(t('actCopy')) + '</button>' +
     '<button class="act" data-act="edit" data-idx="' + o.index + '">' + esc(t('actEdit')) + '</button>' +
     '<button class="act" data-act="del" data-idx="' + o.index + '">' + esc(t('actDelete')) + '</button></div>' +
-    (o.time ? '<div class="meta">' + esc(o.time) + '</div>' : '') +
+    (o.time ? '<div class="meta">' + esc(fmtTime(o.time)) + '</div>' : '') +
     '</div></div>';
 }
 
@@ -1026,7 +1116,7 @@ function pickerList(){
 }
 function openPicker(){
   if (!state.models.length) return;
-  if (!$('#key-modal').hidden) closeKeyModal();   // une seule modale a la fois
+  closeAllOverlays();   // une seule modale a la fois
   $('#picker-filter').value = '';
   renderPicker();
   pickerIdx = Math.max(0, pickerList().indexOf(state.currentModel));
@@ -1064,8 +1154,23 @@ function updatePill(){ $('#mp-name').textContent = modelName(state.currentModel 
 /* statut par defaut (retour auto apres messages transitoires) */
 function defaultStatus(){
   if (state.busy) return t('statusBusy');
-  if (!state.key) return t('statusNoKey');
+  if (!state.hasKey) return t('statusNoKey');
   return t('statusReady') + ' · ' + modelName(state.currentModel || '');
+}
+
+/* une seule modale a la fois */
+function closeAllOverlays(){
+  ['picker', 'key-modal', 'lang-modal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
+  });
+}
+function activeOverlay(){
+  for (const id of ['key-modal', 'picker', 'lang-modal']){
+    const el = document.getElementById(id);
+    if (el && !el.hidden) return el;
+  }
+  return null;
 }
 
 /* ===================== modale Paramètres ===================== */
@@ -1073,27 +1178,49 @@ const $f = id => document.getElementById(id);
 
 function openSettings(){
   if (state.settings){
-    $f('key-input').value = state.settings.key || '';
+    // la cle n'est jamais renvoyee au JS : on ne remplit pas le champ
+    $f('key-input').value = '';
+    $f('key-input').type = 'password';
+    $f('key-keep-hint').hidden = !state.hasKey;
+    $f('key-clear').hidden = !state.hasKey;
+    $f('key-eye').textContent = t('show');
     $f('temp-range').value = Math.round((state.settings.temperature ?? 0.7) * 100);
     $f('temp-val').textContent = ((state.settings.temperature ?? 0.7)).toFixed(2).replace('.', ',');
     $f('maxtok-input').value = state.settings.maxTokens || 8192;
     $f('sysprompt-input').value = state.settings.systemPrompt || '';
   }
   $f('lang-sel').value = state.lang;
+  closeAllOverlays();
   $f('key-modal').hidden = false;
   setTimeout(() => $f('key-input').focus(), 30);
 }
 function closeKeyModal(){ $f('key-modal').hidden = true; }
-function saveKey(){
-  const k = $f('key-input').value.trim();
-  state.key = k;
-  post('saveSettings', {
-    key: k,
+function settingsPayload(){
+  return {
     temperature: (+$f('temp-range').value) / 100,
     maxTokens: +$f('maxtok-input').value,
     systemPrompt: $f('sysprompt-input').value
-  });
+  };
+}
+function saveKey(){
+  const k = $f('key-input').value.trim();
+  const payload = settingsPayload();
+  if (k){ payload.key = k; state.hasKey = true; }
+  state.settings = Object.assign({}, state.settings, payload, {hasKey: state.hasKey});
+  post('saveSettings', payload);
   closeKeyModal();
+  if (!state.busy) $('#status').textContent = defaultStatus();
+}
+function clearKey(){
+  const payload = settingsPayload();
+  payload.clearKey = true;
+  state.hasKey = false;
+  state.settings = Object.assign({}, state.settings, payload, {hasKey:false});
+  $f('key-input').value = '';
+  $f('key-keep-hint').hidden = true;
+  $f('key-clear').hidden = true;
+  post('saveSettings', payload);
+  if (!state.busy) $('#status').textContent = defaultStatus();
 }
 
 /* ===================== MCP ===================== */
@@ -1131,8 +1258,10 @@ function addPendingImage(dataUrl){
 function renderAttBar(){
   const bar = $('#att-bar');
   bar.hidden = state.pendingImages.length === 0;
-  bar.innerHTML = state.pendingImages.map((u, i) =>
-    '<div class="att-item"><img src="' + u + '"><button class="att-x" data-i="' + i + '">&times;</button></div>').join('');
+  bar.innerHTML = state.pendingImages.map((u, i) => {
+    const src = safeImg(u);
+    return src ? '<div class="att-item"><img src="' + escAttr(src) + '" alt=""><button class="att-x" data-i="' + i + '" title="remove">&times;</button></div>' : '';
+  }).join('');
 }
 function processImageFile(file){
   const reader = new FileReader();
@@ -1228,7 +1357,8 @@ function speakMessage(idx, text){
   const lang = SPEECH_LANGS[state.lang] || 'en-US';
   const voices = speechSynthesis.getVoices();
   const voice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith(lang.slice(0, 2)));
-  if (!voice){
+  // getVoices() peut etre vide juste apres le demarrage : ne pas alerter dans ce cas
+  if (!voice && voices.length > 0){
     $('#status').textContent = t('noVoice');
     clearTimeout(state.statusTimer);
     state.statusTimer = setTimeout(() => { $('#status').textContent = defaultStatus(); }, 5000);
@@ -1270,15 +1400,25 @@ window.api = {
     if (s !== defaultStatus() && s.indexOf(t('statusReady')) !== 0)
       state.statusTimer = setTimeout(() => { $('#status').textContent = defaultStatus(); }, 4500);
   },
-  setKey(k){ state.key = k || ''; },
+  setKey(k){ state.hasKey = !!(k || '').trim(); },   // compatibilite : la cle n'est plus transmise
+  setHasKey(b){
+    state.hasKey = !!b;
+    const hint = document.getElementById('key-keep-hint');
+    const clear = document.getElementById('key-clear');
+    if (hint) hint.hidden = !state.hasKey;
+    if (clear) clear.hidden = !state.hasKey;
+    const ki = document.getElementById('key-input');
+    if (ki) ki.placeholder = state.hasKey ? t('keySavedPh') : 'nvapi-…';
+  },
   setSettings(s){
     state.settings = s || {};
+    if (s && typeof s.hasKey === 'boolean') state.hasKey = s.hasKey;
     // selecteur de micro (dans les Parametres)
     const ms = document.getElementById('mic-sel');
     if (ms && s && s.mics){
       const cur = s.mic || '';
       ms.innerHTML = '<option value="">' + esc(t('micDefault')) + '</option>' +
-        s.mics.map(m => '<option value="' + esc(m.id) + '"' + (m.id === cur ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('');
+        s.mics.map(m => '<option value="' + escAttr(m.id) + '"' + (m.id === cur ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('');
     }
     // si les Parametres sont ouverts, reactualiser le prompt systeme
     // (evite d'ecraser la bascule de langue avec l'ancien texte au moment d'Enregistrer)
@@ -1339,7 +1479,7 @@ window.api = {
     const el = $('#streaming');
     const curD = el ? el.querySelector('details.reasoning') : null;
     if (curD) state.reasoningOpen = curD.open;
-    const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    const now = new Date().toISOString();
     const o = {content:content, reasoning:reasoning, model:model, index:index, time:now, elapsed:elapsed};
     const html = aiMessage(o, false, state.reasoningOpen);
     if (el) el.outerHTML = html;
@@ -1347,11 +1487,12 @@ window.api = {
     if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
   },
   cancelStream(){ const el = $('#streaming'); if (el) el.remove(); },
-  showError(text){
+  showError(text, retry){
     const el = $('#streaming'); if (el) el.remove();
     const d = document.createElement('div');
     d.className = 'error-card';
-    d.innerHTML = '<b>Erreur</b>' + esc(text);
+    d.innerHTML = '<b>' + esc(t('errTitle')) + '</b><div>' + esc(text) + '</div>' +
+      (retry ? '<button class="err-retry" type="button">' + esc(t('retry')) + '</button>' : '');
     inner.appendChild(d);
     if (state.pinned) chatEl.scrollTop = chatEl.scrollHeight;
   },
@@ -1372,7 +1513,7 @@ window.api = {
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
   },
-  openLangPicker: function(){ document.getElementById('lang-modal').hidden = false; }
+  openLangPicker: function(){ closeAllOverlays(); document.getElementById('lang-modal').hidden = false; }
 };
 state.streamModel = '';
 
@@ -1386,9 +1527,10 @@ function renderConvoList(){
     return;
   }
   el.innerHTML = list.map(c =>
-    '<div class="convo' + (c.active ? ' active' : '') + '" data-id="' + esc(c.id) + '">' +
+    '<div class="convo' + (c.active ? ' active' : '') + '" data-id="' + escAttr(c.id) + '" role="button" tabindex="0"' +
+    (c.active ? ' aria-current="true"' : '') + '>' +
     '<div class="t">' + (c.pinned ? '<span class="pin">📌</span> ' : '') + esc(c.title) + '</div>' +
-    '<div class="d">' + esc(c.date) + '</div></div>').join('');
+    '<div class="d">' + esc(fmtDateTime(c.date)) + '</div></div>').join('');
 }
 $('#convo-search').addEventListener('input', renderConvoList);
 
@@ -1475,7 +1617,10 @@ $('#key-link').addEventListener('click', () => post('openUrl', {url:'https://bui
 $('#key-eye').addEventListener('click', () => {
   const k = $('#key-input');
   k.type = k.type === 'password' ? 'text' : 'password';
+  $('#key-eye').textContent = k.type === 'password' ? t('show') : t('hide');
+  k.focus();
 });
+$('#key-clear').addEventListener('click', clearKey);
 $('#key-save').addEventListener('click', saveKey);
 $('#key-cancel').addEventListener('click', closeKeyModal);
 $('#key-input').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveKey(); } });
@@ -1535,6 +1680,19 @@ $('#wipe-btn').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Tab'){
+    const ov = activeOverlay();
+    if (ov){
+      const focusables = Array.from(ov.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      )).filter(el => el.offsetParent !== null);
+      if (focusables.length){
+        const first = focusables[0], last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      }
+    }
+  }
   if (e.key === 'Escape'){
     if (typeof ctxEl !== 'undefined' && ctxEl) closeCtx();
     const mic = document.getElementById('mic-btn');
@@ -1562,6 +1720,11 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('click', e => {
   closeCtx();
+  const retryBtn = e.target.closest('.err-retry');
+  if (retryBtn){
+    if (!state.busy){ retryBtn.disabled = true; post('retry'); }
+    return;
+  }
   /* ouverture d'une conversation au simple clic */
 const cv = e.target.closest('.convo');
 if (cv){ if (!state.busy) post('open', {id: cv.dataset.id}); return; }
@@ -1608,26 +1771,24 @@ const el = e.target.closest('.chip');
 /* menu contextuel conversations */
 let ctxEl = null;
 function closeCtx(){ if (ctxEl){ ctxEl.remove(); ctxEl = null; } }
-$('#convo-list').addEventListener('contextmenu', e => {
-  const item = e.target.closest('.convo');
-  if (!item) return;
-  e.preventDefault();
+function openCtx(item, x, y){
   closeCtx();
+  const convo = state.conversations.find(c => c.id === item.dataset.id);
   ctxEl = document.createElement('div');
   ctxEl.className = 'ctx-menu';
-  ctxEl.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
-  ctxEl.style.top = Math.min(e.clientY, window.innerHeight - 140) + 'px';
+  ctxEl.setAttribute('role', 'menu');
+  ctxEl.style.left = Math.max(8, x) + 'px';
+  ctxEl.style.top = Math.max(8, y) + 'px';
   const id = item.dataset.id;
-  const convo = state.conversations.find(c => c.id === id);
   ctxEl.innerHTML =
-    '<div class="ctx-item" data-a="open">' + esc(t('ctxOpen')) + '</div>' +
-    '<div class="ctx-item" data-a="rename">' + esc(t('ctxRename')) + '</div>' +
-    '<div class="ctx-item" data-a="pin">' + esc(convo && convo.pinned ? t('ctxUnpin') : t('ctxPin')) + '</div>' +
+    '<div class="ctx-item" role="menuitem" data-a="open">' + esc(t('ctxOpen')) + '</div>' +
+    '<div class="ctx-item" role="menuitem" data-a="rename">' + esc(t('ctxRename')) + '</div>' +
+    '<div class="ctx-item" role="menuitem" data-a="pin">' + esc(convo && convo.pinned ? t('ctxUnpin') : t('ctxPin')) + '</div>' +
     '<div class="ctx-sep"></div>' +
-    '<div class="ctx-item" data-a="export">' + esc(t('ctxExport')) + '</div>' +
-    '<div class="ctx-item" data-a="clear">' + esc(t('ctxClear')) + '</div>' +
+    '<div class="ctx-item" role="menuitem" data-a="export">' + esc(t('ctxExport')) + '</div>' +
+    '<div class="ctx-item" role="menuitem" data-a="clear">' + esc(t('ctxClear')) + '</div>' +
     '<div class="ctx-sep"></div>' +
-    '<div class="ctx-item danger" data-a="delete">' + esc(t('ctxDelete')) + '</div>';
+    '<div class="ctx-item danger" role="menuitem" data-a="delete">' + esc(t('ctxDelete')) + '</div>';
   let confirmed = false;
   ctxEl.addEventListener('click', ev => {
     const a = ev.target.closest('.ctx-item'); if (!a) return;
@@ -1647,6 +1808,31 @@ $('#convo-list').addEventListener('contextmenu', e => {
     else if (a.dataset.a === 'delete') post('delete', {id});
   });
   document.body.appendChild(ctxEl);
+  // le menu reste entierement visible, meme pres du bord
+  requestAnimationFrame(() => {
+    if (!ctxEl) return;
+    const r = ctxEl.getBoundingClientRect();
+    if (r.right > window.innerWidth - 8) ctxEl.style.left = Math.max(8, window.innerWidth - r.width - 8) + 'px';
+    if (r.bottom > window.innerHeight - 8) ctxEl.style.top = Math.max(8, window.innerHeight - r.height - 8) + 'px';
+  });
+}
+$('#convo-list').addEventListener('contextmenu', e => {
+  const item = e.target.closest('.convo');
+  if (!item) return;
+  e.preventDefault();
+  openCtx(item, e.clientX, e.clientY);
+});
+$('#convo-list').addEventListener('keydown', e => {
+  const item = e.target.closest('.convo');
+  if (!item) return;
+  if (e.key === 'Enter' || e.key === ' '){
+    e.preventDefault();
+    if (!state.busy) post('open', {id: item.dataset.id});
+  } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')){
+    e.preventDefault();
+    const r = item.getBoundingClientRect();
+    openCtx(item, r.left + 18, r.bottom + 2);
+  }
 });
 
 /* recherche : Entree ouvre le premier resultat, Echap vide */

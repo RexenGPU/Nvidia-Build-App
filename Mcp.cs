@@ -27,6 +27,7 @@ class McpConnection : IDisposable
     string? _session;
     int _nextId;
     readonly ConcurrentDictionary<int, TaskCompletionSource<JsonNode>> _pending = new();
+    readonly StringBuilder _stderr = new();
 
     public List<McpTool> Tools { get; } = new();
     public string? Error { get; private set; }
@@ -52,7 +53,7 @@ class McpConnection : IDisposable
             {
                 ["protocolVersion"] = "2025-06-18",
                 ["capabilities"] = new JsonObject(),
-                ["clientInfo"] = new JsonObject { ["name"] = "NvidiaBuildApp", ["version"] = "1.4" }
+                ["clientInfo"] = new JsonObject { ["name"] = "NvidiaBuildApp", ["version"] = "1.2.0" }
             }, 20000);
 
             Notify("notifications/initialized");
@@ -79,7 +80,8 @@ class McpConnection : IDisposable
         catch (Exception ex)
         {
             Tools.Clear();
-            Error = ex.Message;
+            var detail = _stderr.Length > 0 ? ex.Message + " — " + _stderr.ToString().Trim() : ex.Message;
+            Error = detail.Length > 800 ? detail[..800] + "…" : detail;
             Status = "Erreur de connexion";
             TryKill();
         }
@@ -100,7 +102,22 @@ class McpConnection : IDisposable
         };
         _proc = Process.Start(psi) ?? throw new Exception("Impossible de lancer : " + _cfg.Command);
         _proc.OutputDataReceived += (s, e) => { if (e.Data != null) OnLine(e.Data); };
-        _proc.ErrorDataReceived += (s, e) => { };
+        _proc.ErrorDataReceived += (s, e) =>
+        {
+            if (e.Data == null) return;
+            lock (_stderr)
+            {
+                _stderr.AppendLine(e.Data);
+                if (_stderr.Length > 4000) _stderr.Remove(0, _stderr.Length - 4000);
+            }
+        };
+        _proc.EnableRaisingEvents = true;
+        _proc.Exited += (s, e) =>
+        {
+            foreach (var kv in _pending)
+                if (_pending.TryRemove(kv.Key, out var t))
+                    t.TrySetException(new Exception("Le serveur MCP s'est arrêté"));
+        };
         _proc.BeginOutputReadLine();
         _proc.BeginErrorReadLine();
     }
@@ -120,27 +137,42 @@ class McpConnection : IDisposable
 
     // ------------------------------------------------------------------ JSON-RPC
 
-    async Task<JsonNode> RequestAsync(string method, JsonNode? prms, int timeoutMs)
+    async Task<JsonNode> RequestAsync(string method, JsonNode? prms, int timeoutMs, CancellationToken ct = default)
     {
         int id = Interlocked.Increment(ref _nextId) - 1;
         var msg = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = method };
         if (prms != null) msg["params"] = prms.DeepClone();
 
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        linked.CancelAfter(timeoutMs);
+
         if (_cfg.Transport == "stdio")
         {
+            if (_proc == null || _proc.HasExited)
+                throw new Exception("Le serveur MCP n'est pas démarré");
+
             var tcs = new TaskCompletionSource<JsonNode>(TaskCreationOptions.RunContinuationsAsynchronously);
             _pending[id] = tcs;
-            await _proc!.StandardInput.WriteLineAsync(msg.ToJsonString());
-            await _proc.StandardInput.FlushAsync();
 
-            using var cts = new CancellationTokenSource(timeoutMs);
-            cts.Token.Register(() =>
+            using var reg = linked.Token.Register(() =>
             {
-                if (_pending.TryRemove(id, out var t2))
-                    t2.TrySetException(new TimeoutException($"{method} : pas de réponse du serveur MCP"));
+                if (!_pending.TryRemove(id, out var t2)) return;
+                if (ct.IsCancellationRequested) t2.TrySetCanceled(ct);
+                else t2.TrySetException(new TimeoutException($"{method} : pas de réponse du serveur MCP"));
             });
-            var node = await tcs.Task;
-            return Handle(node);
+
+            try
+            {
+                await _proc.StandardInput.WriteLineAsync(msg.ToJsonString());
+                await _proc.StandardInput.FlushAsync();
+                var node = await tcs.Task;
+                return Handle(node);
+            }
+            catch
+            {
+                _pending.TryRemove(id, out _);
+                throw;
+            }
         }
         else
         {
@@ -149,16 +181,25 @@ class McpConnection : IDisposable
                 Content = new StringContent(msg.ToJsonString(), Encoding.UTF8, "application/json")
             };
             req.Headers.Accept.ParseAdd("application/json, text/event-stream");
-            if (_session != null) req.Headers.Add("Mcp-Session-Id", _session);
-            using var resp = await _http!.SendAsync(req);
+            if (_session != null)
+            {
+                req.Headers.Add("Mcp-Session-Id", _session);
+                req.Headers.TryAddWithoutValidation("MCP-Protocol-Version", "2025-06-18");
+            }
+
+            using var resp = await _http!.SendAsync(req, linked.Token);
+            var body = await resp.Content.ReadAsStringAsync(linked.Token);
+            if (!resp.IsSuccessStatusCode)
+                throw new Exception("MCP HTTP " + (int)resp.StatusCode + " : " +
+                    (body.Length > 400 ? body[..400] + "…" : body));
+
             if (resp.Headers.TryGetValues("Mcp-Session-Id", out var sess))
                 _session = sess.FirstOrDefault();
 
-            var body = await resp.Content.ReadAsStringAsync();
-            var ct = resp.Content.Headers.ContentType?.MediaType ?? "";
+            var mediaType = resp.Content.Headers.ContentType?.MediaType ?? "";
 
             JsonNode? node = null;
-            if (ct.Contains("event-stream"))
+            if (mediaType.Contains("event-stream"))
             {
                 foreach (var raw in body.Split('\n'))
                 {
@@ -202,19 +243,28 @@ class McpConnection : IDisposable
         }
         else if (_http != null)
         {
-            using var req = new HttpRequestMessage(HttpMethod.Post, _cfg.Url)
+            var req = new HttpRequestMessage(HttpMethod.Post, _cfg.Url)
             {
                 Content = new StringContent(msg.ToJsonString(), Encoding.UTF8, "application/json")
             };
             req.Headers.Accept.ParseAdd("application/json, text/event-stream");
-            if (_session != null) req.Headers.Add("Mcp-Session-Id", _session);
-            _ = _http.SendAsync(req);
+            if (_session != null)
+            {
+                req.Headers.Add("Mcp-Session-Id", _session);
+                req.Headers.TryAddWithoutValidation("MCP-Protocol-Version", "2025-06-18");
+            }
+            _ = Task.Run(async () =>
+            {
+                try { using var resp = await _http.SendAsync(req); }
+                catch { }
+                finally { req.Dispose(); }
+            });
         }
     }
 
     // ------------------------------------------------------------------ outils
 
-    public async Task<string> CallToolAsync(string name, string argsJson)
+    public async Task<string> CallToolAsync(string name, string argsJson, CancellationToken ct = default)
     {
         JsonNode? args;
         try { args = string.IsNullOrWhiteSpace(argsJson) ? new JsonObject() : JsonNode.Parse(argsJson); }
@@ -222,7 +272,7 @@ class McpConnection : IDisposable
         if (args is not JsonObject) args = new JsonObject();
 
         var result = await RequestAsync("tools/call",
-            new JsonObject { ["name"] = name, ["arguments"] = args.DeepClone() }, 120000);
+            new JsonObject { ["name"] = name, ["arguments"] = args.DeepClone() }, 120000, ct);
 
         var sb = new StringBuilder();
         if (result["content"] is JsonArray arr)
@@ -253,7 +303,8 @@ class McpConnection : IDisposable
 /// <summary>Gestionnaire global des serveurs MCP + definitions d'outils pour l'API.</summary>
 static class Mcp
 {
-    static readonly Dictionary<string, McpConnection> Conns = new();
+    static readonly ConcurrentDictionary<string, McpConnection> Conns = new();
+    static readonly SemaphoreSlim RefreshGate = new(1, 1);
 
     public static bool IsConnected(string id) => Conns.TryGetValue(id, out var c) && c.Error == null;
     public static int ToolCountOf(string id) => Conns.TryGetValue(id, out var c) && c.Error == null ? c.ToolCount : 0;
@@ -264,43 +315,70 @@ static class Mcp
     /// <summary>Synchronise les connexions avec la configuration (connecte/retire au besoin).</summary>
     public static async Task RefreshAsync(IEnumerable<McpServerConfig> servers)
     {
-        var wanted = servers.Where(s => s.Enabled).ToList();
-
-        foreach (var id in Conns.Keys.Except(wanted.Select(w => w.Id)).ToList())
+        await RefreshGate.WaitAsync();
+        try
         {
-            Conns[id].Dispose();
-            Conns.Remove(id);
-        }
+            var wanted = servers.Where(s => s.Enabled).ToList();
 
-        foreach (var w in wanted)
-        {
-            if (Conns.TryGetValue(w.Id, out var existing) && existing.Matches(w)) continue;
-            if (Conns.TryGetValue(w.Id, out var old)) { old.Dispose(); Conns.Remove(w.Id); }
-            var conn = new McpConnection(w);
-            Conns[w.Id] = conn;
-            await conn.InitAsync();
+            foreach (var id in Conns.Keys.Except(wanted.Select(w => w.Id)).ToList())
+                if (Conns.TryRemove(id, out var old)) old.Dispose();
+
+            foreach (var w in wanted)
+            {
+                if (Conns.TryGetValue(w.Id, out var existing) && existing.Matches(w)) continue;
+                if (Conns.TryRemove(w.Id, out var previous)) previous.Dispose();
+
+                // on n'expose la connexion qu'une fois initialisee : pas de liste d'outils
+                // partiellement remplie visible par une generation en cours.
+                var conn = new McpConnection(w);
+                await conn.InitAsync();
+                Conns[w.Id] = conn;
+            }
         }
+        finally { RefreshGate.Release(); }
     }
 
     public static void Drop(string id)
     {
-        if (Conns.Remove(id, out var c)) c.Dispose();
+        if (Conns.TryRemove(id, out var c)) c.Dispose();
+    }
+
+    static string SafeName(string raw, HashSet<string> used)
+    {
+        var sb = new StringBuilder(raw.Length);
+        foreach (var ch in raw)
+            sb.Append(char.IsLetterOrDigit(ch) || ch == '_' || ch == '-' ? ch : '_');
+        var name = sb.ToString().Trim('_');
+        if (name.Length == 0) name = "tool";
+        if (char.IsDigit(name[0])) name = "t_" + name;
+        if (name.Length > 60) name = name[..60];
+
+        var candidate = name;
+        int n = 2;
+        while (!used.Add(candidate))
+        {
+            var suffix = "_" + n++;
+            candidate = name.Length + suffix.Length > 64
+                ? name[..(64 - suffix.Length)] + suffix
+                : name + suffix;
+        }
+        return candidate;
     }
 
     /// <summary>Definitions d'outils au format OpenAI (tools) — null si aucun outil.</summary>
     public static JsonArray? ToolDefinitions()
     {
-        var arr = new JsonArray();
-        var used = new HashSet<string>();
-        foreach (var (id, conn) in Conns)
+        var defs = new List<(string Name, JsonObject Def)>();
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var conn in Conns.Values)
         {
             if (conn.Error != null) continue;
             foreach (var t in conn.Tools)
             {
-                var apiName = t.RealName;
-                if (!used.Add(apiName)) apiName = id + "__" + apiName;
+                var apiName = SafeName(t.RealName, used);
                 t.ApiName = apiName;
-                arr.Add(new JsonObject
+                defs.Add((apiName, new JsonObject
                 {
                     ["type"] = "function",
                     ["function"] = new JsonObject
@@ -309,20 +387,25 @@ static class Mcp
                         ["description"] = t.Description,
                         ["parameters"] = t.Schema?.DeepClone() ?? new JsonObject { ["type"] = "object" }
                     }
-                });
+                }));
             }
         }
-        return arr.Count > 0 ? arr : null;
+
+        if (defs.Count == 0) return null;
+        var arr = new JsonArray();
+        foreach (var d in defs.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
+            arr.Add(d.Def);
+        return arr;
     }
 
-    public static async Task<string> CallToolAsync(string apiName, string argsJson)
+    public static async Task<string> CallToolAsync(string apiName, string argsJson, CancellationToken ct = default)
     {
-        foreach (var (_, conn) in Conns)
+        foreach (var conn in Conns.Values)
         {
             if (conn.Error != null) continue;
             var tool = conn.Tools.FirstOrDefault(t => t.ApiName == apiName);
             if (tool != null)
-                return await conn.CallToolAsync(tool.RealName, argsJson);
+                return await conn.CallToolAsync(tool.RealName, argsJson, ct);
         }
         throw new Exception("Outil introuvable : " + apiName);
     }

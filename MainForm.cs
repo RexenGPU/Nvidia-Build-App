@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
@@ -91,12 +92,35 @@ class MainForm : Form
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsZoomControlEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
+        core.Settings.AreBrowserAcceleratorKeysEnabled = false;
+
+        // l'interface ne doit jamais quitter la page locale : tout lien part au navigateur
+        core.NavigationStarting += (s, ev) =>
+        {
+            if (IsLocalPage(ev.Uri)) return;
+            ev.Cancel = true;
+            OpenExternal(ev.Uri);
+        };
         core.NewWindowRequested += (s, ev) =>
         {
             ev.Handled = true;
-            try { Process.Start(new ProcessStartInfo(ev.Uri) { UseShellExecute = true }); } catch { }
+            OpenExternal(ev.Uri);
         };
+
         core.NavigateToString(BuildHtml());
+    }
+
+    static bool IsLocalPage(string? uri) =>
+        string.IsNullOrEmpty(uri) || uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
+        || uri.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>N'ouvre que des URL web(http/https) ; refuse file:, javascript:, ms-*, etc.</summary>
+    static void OpenExternal(string? uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri)) return;
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var u)) return;
+        if (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps) return;
+        try { Process.Start(new ProcessStartInfo(u.AbsoluteUri) { UseShellExecute = true }); } catch { }
     }
 
     string BuildHtml()
@@ -114,7 +138,14 @@ class MainForm : Form
             (s ?? Stream.Null).CopyTo(ms);
             logo = "data:image/png;base64," + Convert.ToBase64String(ms.ToArray());
         }
-        return html.Replace("{{LOGO}}", logo);
+
+        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(18));
+        var version = asm.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "1.0.0";
+
+        return html
+            .Replace("{{LOGO}}", logo)
+            .Replace("{{NONCE}}", nonce)
+            .Replace("{{VERSION}}", version);
     }
 
     // ---------------------------------------------------------------- pont JS
@@ -128,6 +159,23 @@ class MainForm : Form
     }
 
     void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        // une trame malformee ne doit jamais faire tomber l'application
+        try { OnWebMessageCore(e); }
+        catch (Exception ex) { LogUi("message: " + ex.Message); }
+    }
+
+    static void LogUi(string line)
+    {
+        try
+        {
+            File.AppendAllText(Path.Combine(Store.Dir, "ui_errors.log"),
+                DateTime.Now.ToString("s") + " : " + line + Environment.NewLine);
+        }
+        catch { }
+    }
+
+    void OnWebMessageCore(CoreWebView2WebMessageReceivedEventArgs e)
     {
         using var doc = JsonDocument.Parse(e.WebMessageAsJson);
         var root = doc.RootElement;
@@ -143,7 +191,6 @@ class MainForm : Form
                 else FirstRunCheck();
                 _ = RefreshMcpAndPush();
                 _ = RefreshModelsAsync();
-                try { File.AppendAllText(Path.Combine(Store.Dir, "ui_ready.log"), DateTime.Now.ToString("s") + Environment.NewLine); } catch { }
                 break;
             case "newChat": NewChat(); break;
             case "open":
@@ -173,7 +220,7 @@ class MainForm : Form
                 break;
             case "copyMsg": CopyMessage(root.TryGetProperty("index", out var ci) ? ci.GetInt32() : -1); break;
             case "openUrl":
-                try { Process.Start(new ProcessStartInfo(root.GetProperty("url").GetString() ?? "") { UseShellExecute = true }); } catch { }
+                OpenExternal(root.TryGetProperty("url", out var urlEl) ? urlEl.GetString() : null);
                 break;
             case "regenerate": RegenerateFrom(root.GetProperty("index").GetInt32()); break;
             case "deleteMsg": DeleteMessage(root.GetProperty("index").GetInt32()); break;
@@ -184,16 +231,29 @@ class MainForm : Form
             case "pin": TogglePin(root.TryGetProperty("id", out var pidx) ? pidx.GetString() : null); break;
             case "export": ExportConversation(root.TryGetProperty("id", out var eidx) ? eidx.GetString() : null); break;
             case "clearMessages": ClearMessages(root.TryGetProperty("id", out var clidx) ? clidx.GetString() : null); break;
+            case "retry": RetryLast(); break;
 
             case "saveSettings":
                 {
-                    Store.Settings.ApiKey = root.GetProperty("key").GetString() ?? "";
+                    bool clear = root.TryGetProperty("clearKey", out var ck) && ck.ValueKind == JsonValueKind.True;
+                    if (clear)
+                    {
+                        Store.Settings.ApiKey = "";
+                    }
+                    else if (root.TryGetProperty("key", out var keyEl) && keyEl.ValueKind == JsonValueKind.String)
+                    {
+                        var key = keyEl.GetString() ?? "";
+                        if (key.Length > 0) Store.Settings.ApiKey = key;   // vide = conserver la cle existante
+                    }
                     if (root.TryGetProperty("temperature", out var tempEl))
                         Store.Settings.Temperature = Math.Clamp((float)tempEl.GetDouble(), 0f, 2f);
                     if (root.TryGetProperty("maxTokens", out var mtEl))
-                        Store.Settings.MaxTokens = Math.Clamp((int)mtEl.GetInt32(), 256, 32768);
-                    Store.Settings.SystemPrompt = root.GetProperty("systemPrompt").GetString() ?? Nvidia.SystemPrompt;
+                        Store.Settings.MaxTokens = Math.Clamp(mtEl.GetInt32(), 256, 32768);
+                    if (root.TryGetProperty("systemPrompt", out var spEl) && spEl.ValueKind == JsonValueKind.String)
+                        Store.Settings.SystemPrompt = spEl.GetString() ?? Loc.Sys(Loc.L);
                     Store.SaveSettings();
+                    RunJs($"window.api.setHasKey({J(!string.IsNullOrWhiteSpace(Store.Settings.ApiKey))})");
+                    PushSettings();
                     PushKeyMissing();
                     PushStatus();
                     _ = RefreshModelsAsync();
@@ -295,7 +355,7 @@ class MainForm : Form
     {
         RunJs($"window.api.setLang({J(Store.Settings.Lang)})");
         PushSettings();
-        RunJs($"window.api.setKey({J(Store.Settings.ApiKey)})");
+        RunJs($"window.api.setHasKey({J(!string.IsNullOrWhiteSpace(Store.Settings.ApiKey))})");
         RunJs($"window.api.setModels({J(ModelList())}, {J(CurrentModel())})");
         PushConversations();
         PushMessages();
@@ -341,7 +401,7 @@ class MainForm : Form
     {
         RunJs($"window.api.setSettings({J(new
         {
-            key = Store.Settings.ApiKey,
+            hasKey = !string.IsNullOrWhiteSpace(Store.Settings.ApiKey),
             temperature = Store.Settings.Temperature,
             maxTokens = Store.Settings.MaxTokens,
             systemPrompt = Store.Settings.SystemPrompt,
@@ -388,7 +448,7 @@ class MainForm : Form
         {
             id = c.Id,
             title = c.Title,
-            date = c.UpdatedAt.ToString("dd/MM/yyyy HH:mm"),
+            date = c.UpdatedAt.ToString("o"),
             pinned = c.Pinned,
             active = c == _convo
         }).ToList())})");
@@ -409,7 +469,7 @@ class MainForm : Form
                     reasoning = m.Reasoning,
                     model = m.Model,
                     index = i,
-                    time = m.CreatedAt.ToString("HH:mm"),
+                    time = m.CreatedAt.ToString("o"),
                     elapsed = m.ElapsedMs.HasValue ? Math.Round(m.ElapsedMs.Value / 1000.0, 1) : (double?)null,
                     toolName = m.ToolName,
                     toolCalls = m.ToolCalls?.Select(tc => new { id = tc.Id, name = tc.Name, arguments = tc.Arguments }).ToList(),
@@ -438,13 +498,17 @@ class MainForm : Form
 
     void FirstRunCheck()
     {
-        if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey))
+        if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey) && !Store.Settings.SettingsPrompted)
+        {
+            Store.Settings.SettingsPrompted = true;
+            Store.SaveSettings();
             RunJs("window.api.openSettings()");
+        }
     }
 
     void NewChat()
     {
-        if (_busy) return;
+        if (_busy) { RunJs($"window.api.setStatus({J(Loc.S("busyStop"))})"); return; }
         _convo = null;
         PushMessages();
         PushConversations();
@@ -452,7 +516,7 @@ class MainForm : Form
 
     void OpenConversation(Conversation c)
     {
-        if (_busy) return;
+        if (_busy) { RunJs($"window.api.setStatus({J(Loc.S("busyStop"))})"); return; }
         _convo = c;
         PushMessages();
         PushConversations();
@@ -467,13 +531,15 @@ class MainForm : Form
 
     void RenameConversation(string? id)
     {
-        if (_busy) return;
+        if (_busy) { RunJs($"window.api.setStatus({J(Loc.S("busyStop"))})"); return; }
         var c = _conversations.FirstOrDefault(x => x.Id == id);
         if (c == null) return;
         var name = PromptForm.Ask(this, Loc.S("renameTitle"), Loc.S("renameLabel"), c.Title);
         if (name is { Length: > 0 })
         {
+            if (name.Length > 80) name = name[..80];
             c.Title = name;
+            c.TitleLocked = true;   // un titre choisi par l'utilisateur n'est jamais ecrase
             c.Save();
             PushConversations();
         }
@@ -505,7 +571,11 @@ class MainForm : Form
     {
         if (!ModelList().Contains(name)) return;
         Store.Settings.LastModel = name;
-        if (_convo != null) _convo.Model = name;
+        if (_convo != null)
+        {
+            _convo.Model = name;
+            _convo.Save();
+        }
         Store.SaveSettings();
         PushStatus();
     }
@@ -530,15 +600,14 @@ class MainForm : Form
 
         if (_convo == null)
         {
-            _convo = new Conversation { Model = model };
+            _convo = new Conversation { Model = model, Title = Loc.S("newConvoTitle") };
             _conversations.Insert(0, _convo);
         }
         if (_convo.Messages.Count == 0)
         {
             var t = text.ReplaceLineEndings(" ").Trim();
-            _convo.Title = t.Length > 0
-                ? (t.Length > 44 ? t[..44] + "..." : t)
-                : (images.Count > 0 ? "Images" : _convo.Title);
+            if (t.Length > 0) _convo.Title = t.Length > 44 ? t[..44] + "..." : t;
+            else if (images.Count > 0) _convo.Title = Loc.S("imagesTitle");
         }
 
         var msg = new ChatMessage { Role = "user", Content = text };
@@ -583,10 +652,10 @@ class MainForm : Form
     }
 
     /// <summary>Titre de conversation genere par le modele apres le premier echange.</summary>
-    async Task GenerateTitleAsync()
+    async Task GenerateTitleAsync(Conversation convo)
     {
-        var convo = _convo;
-        if (convo == null || Store.Settings.ApiKey.Length == 0) return;
+        if (convo.TitleLocked || convo.TitleGenerated) return;
+        if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey)) return;
         try
         {
             var firstUser = convo.Messages.FirstOrDefault(m => m.Role == "user");
@@ -596,14 +665,18 @@ class MainForm : Form
             if (extract.Length > 600) extract = extract[..600];
 
             var title = await LlmClient.CompleteAsync(
-                Nvidia.BaseUrl, Store.Settings.ApiKey, CurrentModel(),
+                Nvidia.BaseUrl, Store.Settings.ApiKey, convo.Model ?? Nvidia.DefaultModel,
                 new List<ChatMessage> { new() { Role = "user", Content = extract } },
                 Nvidia.TitlePrompt, 50);
+
+            // la conversation a pu etre renommee ou supprimee pendant l'appel
+            if (convo.TitleLocked || convo.TitleGenerated || !_conversations.Contains(convo)) return;
 
             title = title.ReplaceLineEndings(" ").Trim().Trim('"', '\'', '`', '*', '#', '.', ':', '-');
             if (title.Length == 0) return;
             if (title.Length > 60) title = title[..60];
             convo.Title = title;
+            convo.TitleGenerated = true;
             convo.Save();
             PushConversations();
         }
@@ -617,35 +690,79 @@ class MainForm : Form
         public readonly StringBuilder Args = new();
     }
 
+    readonly HashSet<string> _alwaysTools = new(StringComparer.Ordinal);
+
+    /// <summary>Historique borne : on ne coupe jamais entre un appel d'outil et son resultat.</summary>
+    static List<ChatMessage> BuildHistory(Conversation convo)
+    {
+        var msgs = convo.Messages;
+        int start = Math.Max(0, msgs.Count - 60);
+        while (start < msgs.Count && msgs[start].Role != "user") start++;
+        if (start >= msgs.Count) start = Math.Max(0, msgs.Count - 60);
+        return msgs.Skip(start).ToList();
+    }
+
+    /// <summary>Conserve une reponse interrompue (arret utilisateur ou erreur reseau).</summary>
+    static void SavePartial(Conversation convo, string model, string content, string reasoning, long elapsedMs)
+    {
+        var (thinkReason, clean) = Think.Split(content ?? "");
+        if (string.IsNullOrEmpty(reasoning) && thinkReason.Length > 0) reasoning = thinkReason;
+        if (string.IsNullOrWhiteSpace(clean) && string.IsNullOrWhiteSpace(reasoning)) return;
+        if (convo.Messages.LastOrDefault() is { Role: "assistant" } last && last.Content == clean) return;
+
+        convo.Messages.Add(new ChatMessage
+        {
+            Role = "assistant",
+            Model = model,
+            Content = clean,
+            Reasoning = string.IsNullOrWhiteSpace(reasoning) ? null : reasoning,
+            ElapsedMs = elapsedMs,
+        });
+        convo.Save();
+    }
+
+    ToolConfirmForm.Answer AskToolApproval(ToolCallData tc)
+    {
+        if (_alwaysTools.Contains(tc.Name)) return ToolConfirmForm.Answer.Once;
+        var args = tc.Arguments ?? "{}";
+        if (args.Length > 6000) args = args[..6000] + "\n…";
+        var answer = ToolConfirmForm.Ask(this, tc.Name, args);
+        if (answer == ToolConfirmForm.Answer.Always) _alwaysTools.Add(tc.Name);
+        return answer;
+    }
+
     async Task GenerateReplyAsync()
     {
-        if (_convo == null) return;
+        var convo = _convo;
+        if (convo == null) return;
         var model = CurrentModel();
 
         _busy = true;
         _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
         RunJs("window.api.setBusy(true)");
         PushStatus();
 
         var sw = Stopwatch.StartNew();
         string reasonAll = "";
+        string roundContent = "", roundReason = "";
         int rounds = 0;
-        string? error = null;
 
         try
         {
             while (true)
             {
+                ct.ThrowIfCancellationRequested();
                 rounds++;
                 if (rounds > 8)
                 {
-                    _convo.Messages.Add(new ChatMessage
+                    convo.Messages.Add(new ChatMessage
                     {
                         Role = "assistant",
                         Content = Loc.S("rounds"),
                         Model = model
                     });
-                    _convo.Save();
+                    convo.Save();
                     RunJs("window.api.cancelStream()");
                     PushMessages();
                     break;
@@ -657,13 +774,16 @@ class MainForm : Form
                 var reasonBuf = new StringBuilder();
                 var toolAcc = new List<ToolAcc>();
                 long lastTick = 0;
+                roundContent = "";
+                roundReason = "";
 
-                var history = _convo.Messages.TakeLast(60).ToList();
+                var history = BuildHistory(convo);
                 await foreach (var d in LlmClient.StreamAsync(
                     Nvidia.BaseUrl, Store.Settings.ApiKey, model, history,
                     Store.Settings.SystemPrompt, Store.Settings.Temperature, Store.Settings.MaxTokens,
-                    Mcp.ToolDefinitions(), _cts.Token))
+                    Mcp.ToolDefinitions(), ct))
                 {
+                    ct.ThrowIfCancellationRequested();
                     if (d.Reasoning is { Length: > 0 }) reasonBuf.Append(d.Reasoning);
                     if (d.Content is { Length: > 0 }) contentBuf.Append(d.Content);
                     if (d.ToolChunks != null)
@@ -687,6 +807,9 @@ class MainForm : Form
                         RunJs($"window.api.streamUpdate({J(liveContent)}, {J(reasoning)})");
                     }
                 }
+
+                roundContent = contentBuf.ToString();
+                roundReason = reasonBuf.ToString();
 
                 if (reasonBuf.Length > 0)
                     reasonAll += (reasonAll.Length > 0 ? "\n" : "") + reasonBuf.ToString();
@@ -715,16 +838,17 @@ class MainForm : Form
                         Reasoning = reasonAll.Length > 0 ? reasonAll : null,
                         ElapsedMs = sw.ElapsedMilliseconds,
                     };
-                    _convo.Messages.Add(final);
-                    _convo.Save();
+                    convo.Messages.Add(final);
+                    convo.Save();
 
-                    int idx = _convo.Messages.Count - 1;
+                    int idx = convo.Messages.Count - 1;
                     double elapsed = Math.Round(sw.Elapsed.TotalSeconds, 1);
                     RunJs($"window.api.streamEnd({J(final.Content)}, {J(final.Reasoning)}, {J(model)}, {idx}, {elapsed.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)})");
 
-                    // auto-titre apres le premier echange
-                    if (_convo.Messages.Count == 2)
-                        _ = GenerateTitleAsync();
+                    // auto-titre apres le premier echange (meme s'il y a eu des outils)
+                    bool firstExchange = !convo.TitleGenerated && !convo.TitleLocked
+                        && convo.Messages.Count(m => m.Role == "user") == 1;
+                    if (firstExchange) _ = GenerateTitleAsync(convo);
                     break;
                 }
 
@@ -737,19 +861,31 @@ class MainForm : Form
                     Reasoning = reasonBuf.Length > 0 ? reasonBuf.ToString() : null,
                     ToolCalls = toolCalls,
                 };
-                _convo.Messages.Add(callMsg);
-                _convo.Save();
+                convo.Messages.Add(callMsg);
+                convo.Save();
 
                 RunJs("window.api.cancelStream()");
                 PushMessages();
 
                 foreach (var tc in toolCalls)
                 {
+                    ct.ThrowIfCancellationRequested();
                     RunJs($"window.api.setStatus({J(string.Format(Loc.S("tool"), tc.Name))})");
+
                     string result;
-                    try { result = await Mcp.CallToolAsync(tc.Name, tc.Arguments); }
-                    catch (Exception tex) { result = "Erreur : " + tex.Message; }
-                    _convo.Messages.Add(new ChatMessage
+                    var answer = AskToolApproval(tc);
+                    if (answer == ToolConfirmForm.Answer.Deny)
+                    {
+                        result = Loc.S("toolDenied");
+                    }
+                    else
+                    {
+                        try { result = await Mcp.CallToolAsync(tc.Name, tc.Arguments, ct); }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception tex) { result = Loc.S("toolError") + tex.Message; }
+                    }
+
+                    convo.Messages.Add(new ChatMessage
                     {
                         Role = "tool",
                         ToolCallId = tc.Id,
@@ -757,34 +893,70 @@ class MainForm : Form
                         Content = result
                     });
                 }
-                _convo.Save();
+                convo.Save();
                 PushMessages();
             }
         }
-        catch (OperationCanceledException) { RunJs("window.api.cancelStream()"); }
+        catch (OperationCanceledException)
+        {
+            RunJs("window.api.cancelStream()");
+            SavePartial(convo, model, roundContent, roundReason, sw.ElapsedMilliseconds);
+            PushMessages();
+        }
         catch (LlmException ex) when (ex.StatusCode == 404)
         {
             // modele plus disponible : le retirer de la liste et revenir au modele par defaut
             if (Store.Settings.LiveModels != null && Store.Settings.LiveModels.RemoveAll(x => x == model) > 0)
                 Store.SaveSettings();
             if (Store.Settings.LastModel == model) Store.Settings.LastModel = Nvidia.DefaultModel;
-            if (_convo != null && _convo.Model == model) _convo.Model = Nvidia.DefaultModel;
+            if (convo.Model == model) convo.Model = Nvidia.DefaultModel;
+            Store.SaveSettings();
+            convo.Save();
             RunJs($"window.api.setModels({J(ModelList())}, {J(CurrentModel())})");
             RunJs("window.api.cancelStream()");
-            RunJs($"window.api.showError({J(Loc.S("err404"))})");
+            RunJs($"window.api.showError({J(Loc.S("err404"))}, true)");
         }
         catch (Exception ex)
         {
-            error = ex.Message;
             RunJs("window.api.cancelStream()");
-            RunJs($"window.api.showError({J(ex.Message)})");
+            SavePartial(convo, model, roundContent, roundReason, sw.ElapsedMilliseconds);
+            PushMessages();
+            RunJs($"window.api.showError({J(FriendlyError(ex))}, true)");
         }
+        finally
+        {
+            _busy = false;
+            _cts?.Dispose(); _cts = null;
+            RunJs("window.api.setBusy(false)");
+            PushConversations();
+            PushStatus();
+        }
+    }
 
-        _busy = false;
-        _cts?.Dispose(); _cts = null;
-        RunJs("window.api.setBusy(false)");
+    static string FriendlyError(Exception ex)
+    {
+        if (ex is LlmException le)
+        {
+            if (le.StatusCode == 401 || le.StatusCode == 403) return Loc.S("errAuth");
+            if (le.StatusCode == 429) return Loc.S("errRate");
+            if (le.StatusCode >= 500) return Loc.S("errServer");
+        }
+        if (ex is HttpRequestException or TaskCanceledException or IOException)
+            return Loc.S("errNetwork");
+        return ex.Message;
+    }
+
+    void RetryLast()
+    {
+        if (_busy || _convo == null) return;
+        var msgs = _convo.Messages;
+        // retire la reponse partielle / les resultats d'outils apres le dernier message utilisateur
+        while (msgs.Count > 0 && msgs[^1].Role != "user") msgs.RemoveAt(msgs.Count - 1);
+        if (msgs.Count == 0 || msgs[^1].Role != "user") return;
+        _convo.Save();
+        PushMessages();
         PushConversations();
-        PushStatus();
+        _ = GenerateReplyAsync();
     }
 
     void RegenerateFrom(int index)
@@ -818,6 +990,7 @@ class MainForm : Form
         _convo.Messages.RemoveRange(index, _convo.Messages.Count - index);
         var edited = new ChatMessage { Role = "user", Content = text, Images = oldImages, ImageThumbs = oldThumbs };
         _convo.Messages.Add(edited);
+        if (index == 0) _convo.TitleGenerated = false;   // le premier message a change : nouveau titre possible
         _convo.Save();
 
         PushMessages();
@@ -848,6 +1021,7 @@ class MainForm : Form
         var c = _conversations.FirstOrDefault(x => x.Id == id) ?? _convo;
         if (c == null || c.Messages.Count == 0) return;
         c.Messages.Clear();
+        c.TitleGenerated = false;   // un nouveau premier message pourra re-titrer
         c.Save();
         if (c == _convo) PushMessages();
         PushConversations();
@@ -862,12 +1036,12 @@ class MainForm : Form
         sb.AppendLine("# " + c.Title);
         sb.AppendLine();
         sb.AppendLine(string.Format(Loc.S("exportHeader"),
-            DateTime.Now.ToString(Loc.S("dateFmt").Replace("HH", "HH").Replace("mm", "mm")), c.Model ?? CurrentModel()));
+            DateTime.Now.ToString(Loc.S("dateFmt"), Loc.Culture), c.Model ?? CurrentModel()));
         sb.AppendLine();
         foreach (var m in c.Messages)
         {
             sb.AppendLine(m.Role == "user"
-                ? "## Vous"
+                ? "## " + Loc.S("exportUser")
                 : m.Role == "tool"
                     ? $"## {m.ToolName}"
                     : $"## NVIDIA Build App{(m.Model != null ? $" ({m.Model})" : "")}");

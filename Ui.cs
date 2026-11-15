@@ -162,3 +162,93 @@ class PromptForm : Form
         return f.ShowDialog(owner) == DialogResult.OK ? f._box.Text.Trim() : null;
     }
 }
+
+/// <summary>Confirmation d'un appel d'outil MCP (l'IA peut executer des commandes locales).</summary>
+class ToolConfirmForm : Form
+{
+    public enum Answer { Deny, Once, Always }
+
+    public Answer Result { get; private set; } = Answer.Deny;
+
+    ToolConfirmForm(string tool, string args)
+    {
+        Text = Loc.S("toolAskTitle");
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        StartPosition = FormStartPosition.CenterParent;
+        MaximizeBox = MinimizeBox = false;
+        ShowInTaskbar = false;
+        ClientSize = new Size(600, 460);
+        BackColor = Theme.Bg;
+        Font = Theme.UI;
+        AutoScaleMode = AutoScaleMode.Dpi;
+
+        var label = new Label
+        {
+            Text = string.Format(Loc.S("toolAskBody"), tool),
+            ForeColor = Theme.Text,
+            Location = new Point(18, 16),
+            Size = new Size(564, 46),
+            Font = Theme.UIBold,
+        };
+
+        var box = new TextBox
+        {
+            Multiline = true,
+            ReadOnly = true,
+            WordWrap = false,
+            ScrollBars = ScrollBars.Both,
+            Location = new Point(18, 70),
+            Size = new Size(564, 296),
+            BackColor = Theme.InputBg,
+            ForeColor = Theme.Text,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = new Font("Consolas", 9f),
+            Text = args,
+        };
+
+        var hint = new Label
+        {
+            Text = Loc.S("toolAskHint"),
+            ForeColor = Theme.TextDim,
+            Location = new Point(18, 374),
+            Size = new Size(564, 24),
+            Font = Theme.Small,
+        };
+
+        var deny = new RoundButton
+        {
+            Text = Loc.S("toolDeny"), Back = Theme.CardBg, BackHover = Theme.ErrorBg,
+            TextCol = Theme.Error, Border = Theme.CodeBorder,
+            Location = new Point(18, 406), Size = new Size(150, 38)
+        };
+        deny.Click += (s, e) => { Result = Answer.Deny; Close(); };
+
+        var always = new RoundButton
+        {
+            Text = Loc.S("toolAlways"), Back = Theme.CardBg, BackHover = Theme.Hover,
+            TextCol = Theme.Text, Border = Theme.CodeBorder,
+            Location = new Point(178, 406), Size = new Size(200, 38)
+        };
+        always.Click += (s, e) => { Result = Answer.Always; Close(); };
+
+        var once = new RoundButton
+        {
+            Text = Loc.S("toolAllow"), Back = Theme.Accent, TextCol = Theme.AccentText,
+            Location = new Point(388, 406), Size = new Size(194, 38)
+        };
+        once.Click += (s, e) => { Result = Answer.Once; Close(); };
+
+        AcceptButton = once;
+        CancelButton = deny;
+        Controls.AddRange(new Control[] { label, box, hint, deny, always, once });
+    }
+
+    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Theme.DarkTitleBar(this); }
+
+    public static Answer Ask(IWin32Window owner, string tool, string args)
+    {
+        using var f = new ToolConfirmForm(tool, args);
+        f.ShowDialog(owner);
+        return f.Result;
+    }
+}
