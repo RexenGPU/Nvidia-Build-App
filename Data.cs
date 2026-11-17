@@ -126,6 +126,23 @@ public static class Nvidia
 
     public static bool LooksNonChat(string id) => NonChatRx.IsMatch(id);
 
+    /// <summary>
+    /// Liste utilisable : retire les modeles non-chat connus, ceux marques morts (404)
+    /// et les doublons. Si tout est filtre, on ne garde que la liste curatee nettoyee.
+    /// </summary>
+    public static List<string> UsableModels(IEnumerable<string> source, ICollection<string>? dead = null)
+    {
+        bool Alive(string m) =>
+            !string.IsNullOrWhiteSpace(m)
+            && !KnownExcluded.Contains(m)
+            && !LooksNonChat(m)
+            && (dead == null || !dead.Contains(m, StringComparer.OrdinalIgnoreCase));
+
+        var list = source.Where(Alive).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (list.Count == 0) list = Models.Where(Alive).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return list;
+    }
+
     // Modeles capables d'analyser des images (vision / omni-modal)
     static readonly System.Text.RegularExpressions.Regex VisionRx =
         new("vision|omni|kimi-k|glimmer|glm-5\\.3-flash|deepseek-v4",
@@ -206,6 +223,10 @@ public class AppSettings
     public bool SettingsPrompted { get; set; }
     public string? MicDeviceId { get; set; }   // micro selectionne pour la dictee
     public List<string>? LiveModels { get; set; }   // liste reelle recuperee de l'API (GET /models)
+    public List<string>? DeadModels { get; set; }   // modeles retires (404) : ne plus jamais les proposer
+    public DateTime? ModelsFetchedAt { get; set; }  // date UTC du dernier rafraichissement reussi
+    public DateTime? UpdateCheckedAt { get; set; }  // date UTC de la derniere recherche de mise a jour
+    public string? SkippedUpdate { get; set; }      // version que l'utilisateur a choisi d'ignorer
     public float Temperature { get; set; } = 0.7f;
     public int MaxTokens { get; set; } = 8192;
     public string SystemPrompt { get; set; } = Nvidia.SystemPromptEn;

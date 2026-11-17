@@ -13,7 +13,9 @@ A ChatGPT-style desktop chat app for Windows, powered by the NVIDIA NIM API ([bu
 - ChatGPT-like interface — dark NVIDIA-style theme (WebView2)
 - Full markdown rendering: headings, lists, tables, quotes, **code blocks with syntax highlighting + copy button**
 - Token-by-token streaming with live, collapsible AI reasoning (works with "thinking" models)
-- Latest models **auto-fetched from the API** (Nemotron 3, DeepSeek, GLM-5.3, Kimi, Gemma, Mistral…) — the list is always up to date
+- Latest models **auto-fetched from the API** and **kept fresh**: refreshed at launch, every 10 minutes, when the window regains focus, when the picker opens, and after saving settings — with a ⟳ button in the picker
+- Deleted/retired models (HTTP 404) are **blacklisted permanently**, so the app automatically switches to a working model instead of failing
+- **Built-in updates**: the app checks GitHub Releases at launch and every 30 minutes, verifies the download with its SHA-256 digest, then replaces and restarts itself — or opens the release page in one click
 - `/model` picker with keyboard navigation and filter, like Opencode / Claude Code
 - **MCP servers** (Model Context Protocol): give the AI tools — local commands (stdio) or remote endpoints (Streamable HTTP)
 - 6 languages: English (default), Fran&ccedil;ais, Espa&ntilde;ol, Deutsch, Italiano, Portugu&ecirc;s — with a first-launch picker
@@ -34,6 +36,19 @@ A ChatGPT-style desktop chat app for Windows, powered by the NVIDIA NIM API ([bu
 - **Interrupted replies are kept**, with a **Retry** button; partial text is never lost on network errors or 429/5xx
 - Stale models are detected (404) and the list falls back automatically; history trimming never splits a tool call from its result
 - MCP names are normalized (API-safe, case-insensitive, collision-free), connections are thread-safe and cancellable
+
+## Updates (3.1)
+
+- **Automatic check** at launch and every 30 minutes (can be disabled by skipping a version — the app remembers it)
+- **Manual check** and live download progress from **Settings → Updates** or the update banner
+- **Verified install**: only binaries from `github.com/RexenGPU/Nvidia-Build-App/releases` are accepted, size is sanity-checked, the SHA-256 digest published by GitHub is enforced, and the replacement is hash-verified before the new version starts
+- **Safe fallback**: if the app runs in a development mode (via `dotnet`) or its folder is read-only, the release page opens instead
+
+## Model list
+
+- Refreshed at launch, every 10 minutes, when the window regains focus, when the `/model` picker opens (at most every 5 minutes) and after saving settings
+- The ⟳ button in the picker forces an immediate refresh
+- A model that returns 404 is added to a persistent blacklist: it is hidden from the picker and never used as a fallback, even if it is still listed by the API
 
 ## Getting started
 

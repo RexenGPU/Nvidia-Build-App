@@ -10,7 +10,7 @@
     <RootNamespace>NvidiaBuildApp</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <Version>3.0.0</Version>
+    <Version>3.1.0</Version>
     <Product>NVIDIA Build App</Product>
     <Description>Assistant de chat IA propulse par l'API NVIDIA NIM (compatible OpenAI)</Description>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>

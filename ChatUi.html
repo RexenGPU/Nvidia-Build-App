@@ -69,6 +69,29 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
   font-size:13.5px;color:#d9eeae;align-items:center;justify-content:space-between;gap:10px}
 #key-banner button{background:var(--green);color:#141f02;border:none;border-radius:9px;padding:8px 14px;font-weight:700;font-size:12.5px;cursor:pointer}
 
+/* banniere de mise a jour */
+#update-banner{display:flex;max-width:860px;margin:12px auto 0;border:1px solid #3d6fb4;background:#101a2a;
+  border-radius:13px;padding:13px 16px;font-size:13.5px;color:#cfe2ff;align-items:center;
+  justify-content:space-between;gap:10px}
+#update-banner[hidden]{display:none}
+#update-banner .upd-actions{display:flex;gap:8px;flex-shrink:0}
+#update-banner button{border:none;border-radius:9px;padding:8px 14px;font-weight:700;font-size:12.5px;cursor:pointer}
+#upd-install{background:#4c8dff;color:#08121f}
+#upd-page{background:#4c8dff;color:#08121f}
+#upd-later{background:none;border:1px solid #35507a !important;color:#a9c4e8}
+#upd-later:hover{color:#fff}
+.upd-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.upd-ver{font-size:13px;font-weight:600}
+.upd-btn{background:#262626;border:1px solid var(--border);color:var(--text);border-radius:9px;
+  padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.upd-btn:hover{border-color:#555}
+.upd-btn:disabled{opacity:.55;cursor:default}
+.upd-btn.primary{background:var(--green);border-color:var(--green);color:#141f02}
+.upd-btn.primary:hover{background:var(--green-soft)}
+#upd-available{margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+#upd-available[hidden]{display:none}
+#upd-new-text{font-size:12.5px;color:#cfe2ff}
+
 .welcome{text-align:center;margin-top:9vh}
 .welcome img{width:78px;height:78px;border-radius:20px;margin-bottom:20px}
 .welcome h1{font-size:27px;font-weight:700;letter-spacing:.2px}
@@ -248,6 +271,14 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
 #picker-card{width:min(540px,94%);background:#1c1c1c;border:1px solid var(--border);border-radius:16px;
   padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .picker-title{font-size:13px;font-weight:700;color:var(--dim);padding:6px 10px 12px;letter-spacing:.4px}
+.picker-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 6px 8px 0}
+.picker-head .picker-title{padding:4px 10px 4px 10px}
+#picker-refresh{background:none;border:1px solid var(--border);color:var(--dim);border-radius:9px;
+  width:30px;height:30px;cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0}
+#picker-refresh:hover{color:var(--text);border-color:#555}
+#picker-refresh.spinning{animation:spin .8s linear infinite;color:var(--green);border-color:var(--green)}
+@keyframes spin{to{transform:rotate(360deg)}}
 #picker-list{max-height:56vh;overflow-y:auto}
 .picker-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 12px;
   border-radius:11px;cursor:pointer;border:1px solid transparent}
@@ -364,6 +395,15 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
     <button id="kb-open">Configurer</button>
   </div>
 
+  <div id="update-banner" hidden>
+    <span id="upd-text">NVIDIA Build App …</span>
+    <div class="upd-actions">
+      <button id="upd-install">Installer</button>
+      <button id="upd-page" hidden>Télécharger</button>
+      <button id="upd-later">Plus tard</button>
+    </div>
+  </div>
+
   <div id="chat"><div id="chat-inner"></div></div>
 
   <div id="input-zone">
@@ -414,7 +454,10 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
   <!-- picker de modèles (façon Claude Code) -->
   <div class="overlay" id="picker" hidden>
     <div id="picker-card">
-      <div class="picker-title" id="picker-title">Choisir le modèle</div>
+      <div class="picker-head">
+        <div class="picker-title" id="picker-title">Choisir le modèle</div>
+        <button id="picker-refresh" type="button" title="Actualiser la liste">&#8635;</button>
+      </div>
       <input id="picker-filter" type="text" placeholder="Filtrer…">
       <div id="picker-list"></div>
       <div class="picker-hint" id="picker-hint">↑ ↓ naviguer · Entrée choisir · Échap fermer</div>
@@ -498,6 +541,21 @@ button:active,.chip:active,.lang-opt:active{transform:scale(.97)}
         </div>
       </div>
 
+      <div class="s-section">
+        <div class="s-title" id="sec-upd-t">Mises à jour</div>
+        <div class="upd-row">
+          <div>
+            <div class="upd-ver">NVIDIA Build App <span class="mono" id="upd-current">v…</span></div>
+            <div class="s-hint" id="upd-status"></div>
+          </div>
+          <button id="upd-check" class="upd-btn" type="button">Vérifier</button>
+        </div>
+        <div id="upd-available" hidden>
+          <span id="upd-new-text"></span>
+          <button id="upd-install-settings" class="upd-btn primary" type="button">Installer</button>
+        </div>
+      </div>
+
       <div class="s-section s-danger">
         <div class="s-title" id="sec-danger-t">Zone dangereuse</div>
         <button id="wipe-btn">Effacer toutes les conversations</button>
@@ -526,7 +584,7 @@ window.onerror = function(msg, src, line, col){
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const chatEl = $('#chat'), inner = $('#chat-inner'), inp = $('#inp');
-const state = { busy:false, pinned:true, messages:[], models:[], currentModel:'', hasKey:false, conversations:[], settings:{}, mcp:[], reasoningOpen:true, lang:'en', pendingImages:[] };
+const state = { busy:false, pinned:true, messages:[], models:[], currentModel:'', hasKey:false, conversations:[], settings:{}, mcp:[], reasoningOpen:true, lang:'en', pendingImages:[], update:null };
 
 function post(t, extra) {
   const o = Object.assign({t}, extra||{});
@@ -607,6 +665,7 @@ fr: { newChat:'+  Nouvelle conversation', searchPh:'Rechercher une conversation�
   footerHint:'Entrée = envoyer · Maj+Entrée = nouvelle ligne · /model = modèle · /aide = aide · Échap = arrêter/fermer',
   bannerText:'Clé API manquante — gratuite sur build.nvidia.com. Ouvrez les Paramètres pour la configurer.', bannerBtn:'Configurer',
   pickerTitle:'Choisir le modèle', pickerHint:'↑ ↓ naviguer · Entrée choisir · Échap fermer', pickerFilterPh:'Filtrer les modèles…',
+  refreshModels:'Actualiser la liste des modèles',
   setSub:'Tout est stocké uniquement sur votre machine.',
   secKey:'Clé API NVIDIA', secGen:'Génération', secMcp:'Serveurs MCP', mcpBadge:'outils pour l\'IA', secDanger:'Zone dangereuse',
   lblLang:'Langue', lblTemp:'Température', lblTokens:'Tokens max', lblPrompt:'Prompt système',
@@ -639,7 +698,7 @@ en: { newChat:'+  New conversation', searchPh:'Search a conversation…', settin
   inputPh:'Send a message… /model to change model', send:'Send', stop:'Stop', attTitle:'Attach an image', micTitle:'Dictate', secMic:'Microphone (dictation)', micDefault:'(Default)', modelTitle:'Change model (or type /model)', searchNone:'No result', noConvos:'No conversation yet',
   footerHint:'Enter = send · Shift+Enter = new line · /model = pick model · /help = help · Esc = stop/close',
   bannerText:'Missing API key — free on build.nvidia.com. Open Settings to configure it.', bannerBtn:'Configure',
-  pickerTitle:'Choose a model', pickerHint:'↑ ↓ navigate · Enter select · Esc close', pickerFilterPh:'Filter models…',
+  refreshModels:'Refresh the model list', pickerTitle:'Choose a model', pickerHint:'↑ ↓ navigate · Enter select · Esc close', pickerFilterPh:'Filter models…',
   setSub:'Everything is stored only on your machine.',
   secKey:'NVIDIA API key', secGen:'Generation', secMcp:'MCP servers', mcpBadge:'tools for the AI', secDanger:'Danger zone',
   lblLang:'Language', lblTemp:'Temperature', lblTokens:'Max tokens', lblPrompt:'System prompt',
@@ -671,7 +730,7 @@ es: { newChat:'+  Nueva conversación', searchPh:'Buscar una conversación…', 
   inputPh:'Envía un mensaje… /model para cambiar de modelo', send:'Enviar', stop:'Detener', attTitle:'Adjuntar una imagen', micTitle:'Dictar', secMic:'Micrófono (dictado)', micDefault:'(Predeterminado)', modelTitle:'Cambiar de modelo (o escribe /model)', searchNone:'Sin resultados', noConvos:'Todavía no hay conversaciones',
   footerHint:'Intro = enviar · Mayús+Intro = nueva línea · /model = modelo · /help = ayuda · Esc = detener/cerrar',
   bannerText:'Falta la clave API — gratis en build.nvidia.com. Abre los Ajustes para configurarla.', bannerBtn:'Configurar',
-  pickerTitle:'Elegir modelo', pickerHint:'↑ ↓ navegar · Intro elegir · Esc cerrar', pickerFilterPh:'Filtrar modelos…',
+  refreshModels:'Actualizar la lista de modelos', pickerTitle:'Elegir modelo', pickerHint:'↑ ↓ navegar · Intro elegir · Esc cerrar', pickerFilterPh:'Filtrar modelos…',
   setSub:'Todo se guarda solo en tu equipo.',
   secKey:'Clave API de NVIDIA', secGen:'Generación', secMcp:'Servidores MCP', mcpBadge:'herramientas para la IA', secDanger:'Zona de peligro',
   lblLang:'Idioma', lblTemp:'Temperatura', lblTokens:'Tokens máximos', lblPrompt:'Prompt del sistema',
@@ -703,7 +762,7 @@ de: { newChat:'+  Neues Gespräch', searchPh:'Unterhaltung suchen…', settings:
   inputPh:'Nachricht senden… /model für Modellwechsel', send:'Senden', stop:'Stopp', attTitle:'Bild anhängen', micTitle:'Diktieren', secMic:'Mikrofon (Diktat)', micDefault:'(Standard)', modelTitle:'Modell wechseln (oder /model tippen)', searchNone:'Keine Ergebnisse', noConvos:'Noch keine Unterhaltung',
   footerHint:'Enter = senden · Umschalt+Enter = neue Zeile · /model = Modell · /help = Hilfe · Esc = stoppen/schließen',
   bannerText:'API-Schlüssel fehlt — kostenlos auf build.nvidia.com. Öffne die Einstellungen.', bannerBtn:'Konfigurieren',
-  pickerTitle:'Modell wählen', pickerHint:'↑ ↓ navigieren · Enter wählen · Esc schließen', pickerFilterPh:'Modelle filtern…',
+  refreshModels:'Modellliste aktualisieren', pickerTitle:'Modell wählen', pickerHint:'↑ ↓ navigieren · Enter wählen · Esc schließen', pickerFilterPh:'Modelle filtern…',
   setSub:'Alles wird nur lokal gespeichert.',
   secKey:'NVIDIA API-Schlüssel', secGen:'Generierung', secMcp:'MCP-Server', mcpBadge:'Werkzeuge für die KI', secDanger:'Gefahrenzone',
   lblLang:'Sprache', lblTemp:'Temperatur', lblTokens:'Max. Tokens', lblPrompt:'System-Prompt',
@@ -735,7 +794,7 @@ it: { newChat:'+  Nuova conversazione', searchPh:'Cerca una conversazione…', s
   inputPh:'Invia un messaggio… /model per cambiare modello', send:'Invia', stop:'Ferma', attTitle:'Allega un\'immagine', micTitle:'Dettare', secMic:'Microfono (dettatura)', micDefault:'(Predefinito)', modelTitle:'Cambia modello (o digita /model)', searchNone:'Nessun risultato', noConvos:'Ancora nessuna conversazione',
   footerHint:'Invio = invia · Maiusc+Invio = nuova riga · /model = modello · /help = aiuto · Esc = ferma/chiudi',
   bannerText:'Chiave API mancante — gratuita su build.nvidia.com. Apri le Impostazioni.', bannerBtn:'Configura',
-  pickerTitle:'Scegli il modello', pickerHint:'↑ ↓ naviga · Invio scegli · Esc chiudi', pickerFilterPh:'Filtra i modelli…',
+  refreshModels:'Aggiorna l\'elenco dei modelli', pickerTitle:'Scegli il modello', pickerHint:'↑ ↓ naviga · Invio scegli · Esc chiudi', pickerFilterPh:'Filtra i modelli…',
   setSub:'Tutto è salvato solo sul tuo PC.',
   secKey:'Chiave API NVIDIA', secGen:'Generazione', secMcp:'Server MCP', mcpBadge:'strumenti per l\'IA', secDanger:'Zona pericolosa',
   lblLang:'Lingua', lblTemp:'Temperatura', lblTokens:'Token massimi', lblPrompt:'Prompt di sistema',
@@ -767,7 +826,7 @@ pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings
   inputPh:'Envie uma mensagem… /model para trocar o modelo', send:'Enviar', stop:'Parar', attTitle:'Anexar uma imagem', micTitle:'Ditar', secMic:'Microfone (ditado)', micDefault:'(Padrão)', modelTitle:'Trocar modelo (ou digite /model)', searchNone:'Nenhum resultado', noConvos:'Ainda sem conversas',
   footerHint:'Enter = enviar · Shift+Enter = nova linha · /model = modelo · /help = ajuda · Esc = parar/fechar',
   bannerText:'Chave de API ausente — gratuita em build.nvidia.com. Abra as Configurações.', bannerBtn:'Configurar',
-  pickerTitle:'Escolher o modelo', pickerHint:'↑ ↓ navegar · Enter escolher · Esc fechar', pickerFilterPh:'Filtrar modelos…',
+  refreshModels:'Atualizar a lista de modelos', pickerTitle:'Escolher o modelo', pickerHint:'↑ ↓ navegar · Enter escolher · Esc fechar', pickerFilterPh:'Filtrar modelos…',
   setSub:'Tudo é salvo apenas no seu computador.',
   secKey:'Chave de API NVIDIA', secGen:'Geração', secMcp:'Servidores MCP', mcpBadge:'ferramentas para a IA', secDanger:'Zona de perigo',
   lblLang:'Idioma', lblTemp:'Temperatura', lblTokens:'Tokens máximos', lblPrompt:'Prompt do sistema',
@@ -795,6 +854,59 @@ pt: { newChat:'+  Nova conversa', searchPh:'Pesquisar uma conversa…', settings
   helpCtx:'Clique direito numa conversa: abrir, renomear, fixar, exportar, limpar, excluir.' }
 };
 
+/* mises a jour : ajoutees apres coup pour ne pas alourdir chaque bloc de langue */
+const UPD_I18N = {
+  fr:{ updSection:'Mises à jour', updCheck:'Vérifier', updChecking:'Vérification…',
+    updUpToDate:'Vous utilisez la dernière version.', updAvailable:'Une nouvelle version est disponible.',
+    updBanner:'NVIDIA Build App {n} est disponible.', updInstall:'Installer', updLater:'Plus tard',
+    updDownload:'Télécharger', updDownloading:'Téléchargement…', updReady:'Redémarrage pour installer la mise à jour…',
+    updError:'Impossible de vérifier les mises à jour.', updIdle:'Vérification automatique au démarrage.',
+    updManual:'Téléchargement manuel nécessaire : la page de la release va s’ouvrir.',
+    updNew:'Nouvelle version : {n}', updBusy:'Terminez la génération en cours avant de mettre à jour.',
+    updCurrent:'Version actuelle' },
+  en:{ updSection:'Updates', updCheck:'Check', updChecking:'Checking…',
+    updUpToDate:'You are on the latest version.', updAvailable:'A new version is available.',
+    updBanner:'NVIDIA Build App {n} is available.', updInstall:'Install', updLater:'Later',
+    updDownload:'Download', updDownloading:'Downloading…', updReady:'Restarting to install the update…',
+    updError:'Could not check for updates.', updIdle:'Checked automatically at startup.',
+    updManual:'Manual download required: the release page will open.',
+    updNew:'New version: {n}', updBusy:'Finish the current generation before updating.',
+    updCurrent:'Current version' },
+  es:{ updSection:'Actualizaciones', updCheck:'Comprobar', updChecking:'Comprobando…',
+    updUpToDate:'Estás en la última versión.', updAvailable:'Hay una nueva versión disponible.',
+    updBanner:'NVIDIA Build App {n} está disponible.', updInstall:'Instalar', updLater:'Más tarde',
+    updDownload:'Descargar', updDownloading:'Descargando…', updReady:'Reiniciando para instalar la actualización…',
+    updError:'No se pudieron comprobar las actualizaciones.', updIdle:'Se comprueba automáticamente al iniciar.',
+    updManual:'Descarga manual necesaria: se abrirá la página de la versión.',
+    updNew:'Nueva versión: {n}', updBusy:'Termina la generación actual antes de actualizar.',
+    updCurrent:'Versión actual' },
+  de:{ updSection:'Updates', updCheck:'Prüfen', updChecking:'Prüfe…',
+    updUpToDate:'Du verwendest die neueste Version.', updAvailable:'Eine neue Version ist verfügbar.',
+    updBanner:'NVIDIA Build App {n} ist verfügbar.', updInstall:'Installieren', updLater:'Später',
+    updDownload:'Herunterladen', updDownloading:'Wird heruntergeladen…', updReady:'Neustart zum Installieren des Updates…',
+    updError:'Updates konnten nicht geprüft werden.', updIdle:'Wird beim Start automatisch geprüft.',
+    updManual:'Manueller Download nötig: die Release-Seite wird geöffnet.',
+    updNew:'Neue Version: {n}', updBusy:'Beende die laufende Generierung, bevor du aktualisierst.',
+    updCurrent:'Aktuelle Version' },
+  it:{ updSection:'Aggiornamenti', updCheck:'Verifica', updChecking:'Verifica…',
+    updUpToDate:'Stai usando l\'ultima versione.', updAvailable:'È disponibile una nuova versione.',
+    updBanner:'NVIDIA Build App {n} è disponibile.', updInstall:'Installa', updLater:'Più tardi',
+    updDownload:'Scarica', updDownloading:'Download in corso…', updReady:'Riavvio per installare l\'aggiornamento…',
+    updError:'Impossibile verificare gli aggiornamenti.', updIdle:'Verifica automatica all\'avvio.',
+    updManual:'Download manuale necessario: si aprirà la pagina della release.',
+    updNew:'Nuova versione: {n}', updBusy:'Termina la generazione in corso prima di aggiornare.',
+    updCurrent:'Versione attuale' },
+  pt:{ updSection:'Atualizações', updCheck:'Verificar', updChecking:'Verificando…',
+    updUpToDate:'Você está na versão mais recente.', updAvailable:'Uma nova versão está disponível.',
+    updBanner:'NVIDIA Build App {n} está disponível.', updInstall:'Instalar', updLater:'Mais tarde',
+    updDownload:'Baixar', updDownloading:'Baixando…', updReady:'Reiniciando para instalar a atualização…',
+    updError:'Não foi possível verificar atualizações.', updIdle:'Verificado automaticamente na inicialização.',
+    updManual:'Download manual necessário: a página da versão será aberta.',
+    updNew:'Nova versão: {n}', updBusy:'Conclua a geração atual antes de atualizar.',
+    updCurrent:'Versão atual' },
+};
+Object.keys(UPD_I18N).forEach(l => Object.assign(I18N[l], UPD_I18N[l]));
+
 function t(k){
   const d = I18N[state.lang] || I18N.en;
   if (d[k] !== undefined) return d[k];
@@ -803,6 +915,43 @@ function t(k){
 }
 function getSuggestions(){ return t('chips'); }
 function tn(k, n){ return t(k).replace('{n}', String(n)); }
+
+/* ===================== mise a jour ===================== */
+function tv(k, v){ return t(k).replace('{n}', v == null ? '' : String(v)); }
+function renderUpdate(){
+  const u = state.update || { state:'idle', current:'', canAuto:false };
+  const banner = $('#update-banner');
+  const st = $('#upd-status');
+  const cur = u.current || '';
+  $('#upd-current').textContent = cur ? ('v' + cur) : 'v…';
+  $('#upd-new-text').textContent = u.version ? tv('updNew', u.version) : '';
+
+  const lock = u.state === 'checking' || u.state === 'downloading' || u.state === 'ready' || u.state === 'busy';
+  const canInstall = u.state === 'available' && u.canAuto && !lock;
+  $('#upd-check').disabled = lock;
+  $('#upd-check').textContent = u.state === 'checking' ? t('updChecking') : t('updCheck');
+  $('#upd-install').hidden = !canInstall;
+  $('#upd-page').hidden = !(u.state === 'available' && !u.canAuto);
+  $('#upd-later').hidden = lock;
+  $('#upd-install-settings').hidden = !canInstall;
+  $('#upd-available').hidden = !(u.state === 'available' || u.state === 'manual' || u.state === 'ready');
+
+  let msg = t('updIdle');
+  if (u.state === 'checking') msg = t('updChecking');
+  else if (u.state === 'uptodate') msg = t('updUpToDate');
+  else if (u.state === 'available') msg = t('updAvailable');
+  else if (u.state === 'downloading') msg = t('updDownloading');
+  else if (u.state === 'ready') msg = t('updReady');
+  else if (u.state === 'error') msg = t('updError') + (u.detail ? ' (' + u.detail + ')' : '');
+  else if (u.state === 'manual') msg = t('updManual');
+  else if (u.state === 'busy') msg = t('updBusy');
+  st.textContent = msg;
+
+  const showBanner = !!u.version && ['available', 'downloading', 'ready', 'busy'].includes(u.state);
+  banner.hidden = !showBanner;
+  if (showBanner)
+    $('#upd-text').textContent = u.state === 'busy' ? t('updBusy') : tv('updBanner', u.version);
+}
 
 function applyI18n(){
   const $id = id => document.getElementById(id);
@@ -816,11 +965,18 @@ function applyI18n(){
   $id('picker-title').textContent = t('pickerTitle');
   $id('picker-hint').textContent = t('pickerHint');
   $id('picker-filter').placeholder = t('pickerFilterPh');
+  $id('picker-refresh').title = t('refreshModels');
   $id('set-sub').textContent = t('setSub');
   $id('sec-key-t').textContent = t('secKey');
   $id('sec-gen-t').textContent = t('secGen');
   $id('sec-mcp-t').childNodes[0].textContent = t('secMcp') + ' ';
   $id('mcp-badge').textContent = t('mcpBadge');
+  $id('sec-upd-t').textContent = t('updSection');
+  $id('upd-check').textContent = t('updCheck');
+  $id('upd-install').textContent = t('updInstall');
+  $id('upd-install-settings').textContent = t('updInstall');
+  $id('upd-page').textContent = t('updDownload');
+  $id('upd-later').textContent = t('updLater');
   $id('sec-danger-t').textContent = t('secDanger');
   $id('lbl-lang-el').textContent = t('lblLang');
   $id('lbl-temp').textContent = t('lblTemp');
@@ -847,6 +1003,7 @@ function applyI18n(){
   $id('wipe-btn').textContent = t('wipe');
   $id('key-save').textContent = t('save');
   $id('key-cancel').textContent = t('cancel');
+  renderUpdate();
   const send = $id('send-btn');
   send.textContent = state.busy ? t('stop') : t('send');
   const st = $id('status');
@@ -1123,6 +1280,7 @@ function openPicker(){
   $('#picker').hidden = false;
   updatePickerAct();
   setTimeout(() => $('#picker-filter').focus(), 30);
+  post('refreshModels');   // le host throttle (5 min) : la liste suit le catalogue NVIDIA
 }
 function closePicker(){ $('#picker').hidden = true; }
 function renderPicker(){
@@ -1401,6 +1559,16 @@ window.api = {
       state.statusTimer = setTimeout(() => { $('#status').textContent = defaultStatus(); }, 4500);
   },
   setKey(k){ state.hasKey = !!(k || '').trim(); },   // compatibilite : la cle n'est plus transmise
+  setUpdate(u){
+    state.update = u || { state:'idle' };
+    renderUpdate();
+    // en cas de telechargement en cours, l'application peut se fermer d'un instant a l'autre
+  },
+  setUpdateProgress(p){
+    const el = document.getElementById('upd-text');
+    if (el && state.update && state.update.state === 'downloading')
+      el.textContent = tv('updBanner', state.update.version) + ' ' + Math.round(Number(p) || 0) + '%';
+  },
   setHasKey(b){
     state.hasKey = !!b;
     const hint = document.getElementById('key-keep-hint');
@@ -1435,6 +1603,10 @@ window.api = {
     state.models = models || [];
     state.currentModel = current || (state.models[0] || '');
     updatePill();
+    const btn = document.getElementById('picker-refresh');
+    if (btn) btn.classList.remove('spinning');
+    const picker = document.getElementById('picker');
+    if (picker && !picker.hidden){ renderPicker(); updatePickerAct(); }
   },
   setConversations(list){
     state.conversations = list || [];
@@ -1513,7 +1685,12 @@ window.api = {
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
   },
-  openLangPicker: function(){ closeAllOverlays(); document.getElementById('lang-modal').hidden = false; }
+  openLangPicker: function(){ closeAllOverlays(); document.getElementById('lang-modal').hidden = false; },
+  refreshModels: function(force){ if (!state.busy){ const b = document.getElementById('picker-refresh'); if (b && force) b.classList.add('spinning'); } post('refreshModels', {force: !!force}); },
+  checkUpdate: function(){ post('checkUpdate'); },
+  installUpdate: function(){ post('installUpdate'); },
+  skipUpdate: function(){ post('skipUpdate'); },
+  openUpdatePage: function(){ post('openUpdatePage'); }
 };
 state.streamModel = '';
 
@@ -1583,6 +1760,14 @@ $('#send-btn').addEventListener('click', () => { state.busy ? post('stop') : doS
 $('#new-chat').addEventListener('click', () => post('newChat'));
 $('#model-pill').addEventListener('click', openPicker);
 $('#picker-filter').addEventListener('input', () => { renderPicker(); pickerIdx = 0; updatePickerAct(); });
+$('#picker-refresh').addEventListener('click', e => {
+  e.stopPropagation();
+  const btn = $('#picker-refresh');
+  btn.classList.add('spinning');
+  post('refreshModels', {force: true});
+  // si le reseau ne repond pas, on ne laisse pas tourner indefiniment
+  setTimeout(() => btn.classList.remove('spinning'), 25000);
+});
 $('#lang-sel').addEventListener('change', () => {
   state.lang = $('#lang-sel').value;
   applyI18n();
@@ -1595,6 +1780,13 @@ $('#lang-sel').addEventListener('change', () => {
 
 /* selection du micro */
 $('#mic-sel').addEventListener('change', () => post('setMic', {id: $('#mic-sel').value}));
+
+/* mises a jour */
+$('#upd-check').addEventListener('click', () => post('checkUpdate'));
+$('#upd-install').addEventListener('click', () => post('installUpdate'));
+$('#upd-install-settings').addEventListener('click', () => post('installUpdate'));
+$('#upd-page').addEventListener('click', () => post('openUpdatePage'));
+$('#upd-later').addEventListener('click', () => { post('skipUpdate'); $('#update-banner').hidden = true; });
 
 /* choix de langue au premier lancement */
 $('#lang-grid').addEventListener('click', e => {

@@ -16,6 +16,17 @@ class MainForm : Form
     bool _jsReady;
     readonly Queue<string> _pending = new();
 
+    // rafraichissement de la liste des modeles (fichier partage : un seul a la fois)
+    readonly SemaphoreSlim _modelGate = new(1, 1);
+    readonly System.Windows.Forms.Timer _modelTimer = new() { Interval = 10 * 60 * 1000 };
+    static readonly TimeSpan ModelRefreshMinInterval = TimeSpan.FromMinutes(5);
+    readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 30 * 60 * 1000 };
+
+    // mise a jour (GitHub releases)
+    UpdateInfo? _update;
+    bool _updateBusy;
+    static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromMinutes(30);
+
     readonly WebView2 _web = new();
 
     public MainForm()
@@ -43,6 +54,15 @@ class MainForm : Form
 
         Shown += async (s, e) => await InitAsync();
         FormClosing += (s, e) => OnClosingAll();
+
+        // la liste des modeles suit le catalogue NVIDIA : rafraichie au demarrage,
+        // toutes les 10 min, au retour sur la fenetre et a l'ouverture du selecteur
+        _modelTimer.Tick += (s, e) => _ = RefreshModelsAsync();
+        _modelTimer.Start();
+        // le pas de mise a jour : verification au demarrage puis toutes les 30 min (derniere verification memorisee)
+        _updateTimer.Tick += (s, e) => _ = CheckForUpdatesAsync(manual: false);
+        _updateTimer.Start();
+        Activated += (s, e) => { _ = RefreshModelsAsync(); _ = CheckForUpdatesAsync(manual: false); };
 
         _conversations.AddRange(Store.LoadConversations());
         if (_conversations.Count > 0) _convo = _conversations[0];
@@ -191,6 +211,7 @@ class MainForm : Form
                 else FirstRunCheck();
                 _ = RefreshMcpAndPush();
                 _ = RefreshModelsAsync();
+                _ = CheckForUpdatesAsync(manual: false);
                 break;
             case "newChat": NewChat(); break;
             case "open":
@@ -232,6 +253,16 @@ class MainForm : Form
             case "export": ExportConversation(root.TryGetProperty("id", out var eidx) ? eidx.GetString() : null); break;
             case "clearMessages": ClearMessages(root.TryGetProperty("id", out var clidx) ? clidx.GetString() : null); break;
             case "retry": RetryLast(); break;
+            case "refreshModels":
+                {
+                    bool force = root.TryGetProperty("force", out var fm) && fm.ValueKind == JsonValueKind.True;
+                    _ = RefreshModelsAsync(force, force);
+                    break;
+                }
+            case "checkUpdate": _ = CheckForUpdatesAsync(manual: true); break;
+            case "installUpdate": _ = InstallUpdateAsync(); break;
+            case "skipUpdate": SkipUpdate(); break;
+            case "openUpdatePage": OpenExternal(_update?.Url); break;
 
             case "saveSettings":
                 {
@@ -256,7 +287,8 @@ class MainForm : Form
                     PushSettings();
                     PushKeyMissing();
                     PushStatus();
-                    _ = RefreshModelsAsync();
+                    if (!string.IsNullOrWhiteSpace(Store.Settings.ApiKey))
+                        _ = RefreshModelsAsync(force: true, notify: true);
                     break;
                 }
             case "addMcp":
@@ -364,37 +396,200 @@ class MainForm : Form
         RunJs("window.api.setBusy(false)");
     }
 
-    List<string> ModelList() =>
-        Store.Settings.LiveModels is { Count: > 0 } ? Store.Settings.LiveModels : Nvidia.Models.ToList();
+    /// <summary>
+    /// Liste affichee : cache de l'API filtre (modeles retires / non-chat / morts),
+    /// avec repli sur la liste curatee. Ne contient jamais un modele marque mort.
+    /// </summary>
+    List<string> ModelList()
+    {
+        var dead = Store.Settings.DeadModels;
+        IEnumerable<string> source = Store.Settings.LiveModels is { Count: > 0 } ? Store.Settings.LiveModels : Nvidia.Models;
+        var list = source
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Where(m => !Nvidia.KnownExcluded.Contains(m) && !Nvidia.LooksNonChat(m))
+            .Where(m => dead == null || !dead.Contains(m, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (list.Count == 0)
+            list = Nvidia.Models.Where(m => dead == null || !dead.Contains(m, StringComparer.OrdinalIgnoreCase)).ToList();
+        return list;
+    }
+
+    /// <summary>Un modele a renvoye 404 : on le retire definitivement de toutes les listes.</summary>
+    void MarkModelDead(string model)
+    {
+        if (string.IsNullOrWhiteSpace(model)) return;
+        var dead = Store.Settings.DeadModels ??= new List<string>();
+        if (!dead.Contains(model, StringComparer.OrdinalIgnoreCase)) dead.Add(model);
+        Store.Settings.LiveModels?.RemoveAll(x => string.Equals(x, model, StringComparison.OrdinalIgnoreCase));
+        if (string.Equals(Store.Settings.LastModel, model, StringComparison.OrdinalIgnoreCase))
+            Store.Settings.LastModel = "";
+        if (_convo != null && string.Equals(_convo.Model, model, StringComparison.OrdinalIgnoreCase))
+        {
+            _convo.Model = FallbackModel(ModelList());
+            _convo.Save();
+        }
+        Store.SaveSettings();
+    }
 
     /// <summary>
-    /// Liste auto-adaptee : curates verifies presents sur l'API + nouveaux modeles textuels,
-    /// les modeles disparus ou non-chat sont retires automatiquement.
+    /// Rafraichit la liste depuis GET /models : les modeles supprimes disparaissent,
+    /// les nouveaux modeles textuels apparaissent. Throttle 5 min sauf force.
     /// </summary>
-    async Task RefreshModelsAsync()
+    async Task RefreshModelsAsync(bool force = false, bool notify = false)
     {
-        if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey)) return;
+        if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey))
+        {
+            if (notify) RunJs($"window.api.setStatus({J(Loc.S("modelsNoKey"))})");
+            return;
+        }
+        if (!await _modelGate.WaitAsync(0)) return;   // deja en cours
         try
         {
-            var fetched = await LlmClient.FetchModelsAsync(Nvidia.BaseUrl, Store.Settings.ApiKey);
+            var fetchedAt = Store.Settings.ModelsFetchedAt;
+            if (!force && fetchedAt is { } last && DateTime.UtcNow - last < ModelRefreshMinInterval) return;
 
-            var list = Nvidia.Models.Where(fetched.Contains).ToList();   // curates toujours vivants
+            List<string> fetched;
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25)))
+                fetched = await LlmClient.FetchModelsAsync(Nvidia.BaseUrl, Store.Settings.ApiKey, cts.Token);
+            if (fetched.Count == 0) return;
+
+            var live = new HashSet<string>(fetched, StringComparer.OrdinalIgnoreCase);
+
+            var list = Nvidia.Models.Where(live.Contains).ToList();   // curates toujours vivants
             foreach (var m in fetched.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
             {
-                if (list.Contains(m) || Nvidia.Models.Contains(m)) continue;
-                if (Nvidia.KnownExcluded.Contains(m)) continue;         // morts / non-chat connus
-                if (Nvidia.LooksNonChat(m)) continue;                   // nom typique non-chat
+                if (Nvidia.Models.Contains(m, StringComparer.OrdinalIgnoreCase)) continue;
+                if (Nvidia.KnownExcluded.Contains(m) || Nvidia.LooksNonChat(m)) continue;
+                if (list.Contains(m, StringComparer.OrdinalIgnoreCase)) continue;
                 list.Add(m);                                            // nouveau modele textuel
             }
+            if (list.Count == 0) return;                                // reponse inattendue : on garde le cache
 
-            if (list.Count > 0)
+            // un modele revenu en ligne n'est plus considere comme mort
+            if (Store.Settings.DeadModels is { Count: > 0 } dead) dead.RemoveAll(live.Contains);
+
+            Store.Settings.LiveModels = list;
+            Store.Settings.ModelsFetchedAt = DateTime.UtcNow;
+
+            // une conversation / un dernier modele qui pointait sur un modele disparu bascule
+            var cur = CurrentModel();
+            if (_convo != null && !string.IsNullOrEmpty(_convo.Model) &&
+                !list.Contains(_convo.Model, StringComparer.OrdinalIgnoreCase))
             {
-                Store.Settings.LiveModels = list;
-                Store.SaveSettings();
-                RunJs($"window.api.setModels({J(list)}, {J(CurrentModel())})");
+                _convo.Model = cur;
+                _convo.Save();
             }
+            if (!string.IsNullOrEmpty(Store.Settings.LastModel) &&
+                !list.Contains(Store.Settings.LastModel, StringComparer.OrdinalIgnoreCase))
+                Store.Settings.LastModel = cur;
+            Store.SaveSettings();
+
+            RunJs($"window.api.setModels({J(list)}, {J(cur)})");
+            if (notify) RunJs($"window.api.setStatus({J(string.Format(Loc.S("modelsRefreshed"), list.Count))})");
         }
-        catch { }
+        catch
+        {
+            if (notify) RunJs($"window.api.setStatus({J(Loc.S("modelsRefreshFailed"))})");
+        }
+        finally { _modelGate.Release(); }
+    }
+
+    // ---------------------------------------------------------------- mise a jour
+
+    /// <summary>Verifie les releases GitHub (30 min en auto, ou a la demande).</summary>
+    async Task CheckForUpdatesAsync(bool manual)
+    {
+        if (_updateBusy) return;
+        if (!manual)
+        {
+            var last = Store.Settings.UpdateCheckedAt;
+            if (last is { } t && DateTime.UtcNow - t < UpdateCheckInterval) return;
+        }
+
+        _updateBusy = true;
+        if (manual) PushUpdateState("checking");
+        try
+        {
+            var info = await UpdateService.CheckAsync();
+            Store.Settings.UpdateCheckedAt = DateTime.UtcNow;
+            Store.SaveSettings();
+            _update = info;
+
+            if (info == null)
+            {
+                PushUpdateState(manual ? "uptodate" : "idle");
+                return;
+            }
+            if (!manual && string.Equals(Store.Settings.SkippedUpdate, info.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                PushUpdateState("idle");   // deja ignoree par l'utilisateur
+                return;
+            }
+            PushUpdateState("available");
+        }
+        catch (Exception ex)
+        {
+            PushUpdateState(manual ? "error" : "idle", manual ? ex.Message : null);
+        }
+        finally { _updateBusy = false; }
+    }
+
+    void PushUpdateState(string state, string? detail = null)
+    {
+        RunJs($"window.api.setUpdate({J(new
+        {
+            state,
+            version = _update?.Version,
+            url = _update?.Url,
+            notes = _update?.Notes,
+            current = UpdateService.CurrentText,
+            canAuto = _update?.AssetUrl != null && UpdateService.CanSelfUpdate,
+            detail
+        })})");
+    }
+
+    void SkipUpdate()
+    {
+        if (_update == null) return;
+        Store.Settings.SkippedUpdate = _update.Version;
+        Store.SaveSettings();
+        PushUpdateState("idle");
+    }
+
+    async Task InstallUpdateAsync()
+    {
+        var info = _update;
+        if (info == null || _updateBusy) return;
+        if (_busy)
+        {
+            PushUpdateState("busy");
+            return;
+        }
+
+        // pas de remplacement automatique possible : on ouvre la page de la release
+        if (info.AssetUrl == null || !UpdateService.CanSelfUpdate)
+        {
+            OpenExternal(info.Url);
+            PushUpdateState("manual");
+            return;
+        }
+
+        _updateBusy = true;
+        try
+        {
+            PushUpdateState("downloading");
+            var path = await UpdateService.DownloadAsync(info, new Progress<double>(p =>
+                RunJs($"window.api.setUpdateProgress({p.ToString("0", System.Globalization.CultureInfo.InvariantCulture)})")));
+            PushUpdateState("ready");
+            UpdateService.ApplyAndRestart(path);
+            Close();   // le script attend la fermeture, remplace l'exe et relance
+        }
+        catch (Exception ex)
+        {
+            PushUpdateState("error", ex.Message);
+        }
+        finally { _updateBusy = false; }
     }
 
     void PushSettings()
@@ -524,9 +719,17 @@ class MainForm : Form
 
     string CurrentModel()
     {
+        var list = ModelList();
         var m = _convo?.Model ?? Store.Settings.LastModel;
-        if (!string.IsNullOrEmpty(m) && ModelList().Contains(m!)) return m!;
-        return Nvidia.DefaultModel;
+        if (!string.IsNullOrEmpty(m) && list.Contains(m!)) return m!;
+        return FallbackModel(list);
+    }
+
+    /// <summary>Premier modele utilisable : le modele par defaut s'il est encore en ligne, sinon le premier de la liste.</summary>
+    static string FallbackModel(List<string> list)
+    {
+        if (list.Contains(Nvidia.DefaultModel)) return Nvidia.DefaultModel;
+        return list.Count > 0 ? list[0] : Nvidia.DefaultModel;
     }
 
     void RenameConversation(string? id)
@@ -664,8 +867,10 @@ class MainForm : Form
             if (extract.Length == 0) return;
             if (extract.Length > 600) extract = extract[..600];
 
+            // un modele mort (404) ne doit pas etre utilise pour generer le titre
+            var titleModel = convo.Model != null && ModelList().Contains(convo.Model) ? convo.Model : CurrentModel();
             var title = await LlmClient.CompleteAsync(
-                Nvidia.BaseUrl, Store.Settings.ApiKey, convo.Model ?? Nvidia.DefaultModel,
+                Nvidia.BaseUrl, Store.Settings.ApiKey, titleModel,
                 new List<ChatMessage> { new() { Role = "user", Content = extract } },
                 Nvidia.TitlePrompt, 50);
 
@@ -905,16 +1110,14 @@ class MainForm : Form
         }
         catch (LlmException ex) when (ex.StatusCode == 404)
         {
-            // modele plus disponible : le retirer de la liste et revenir au modele par defaut
-            if (Store.Settings.LiveModels != null && Store.Settings.LiveModels.RemoveAll(x => x == model) > 0)
-                Store.SaveSettings();
-            if (Store.Settings.LastModel == model) Store.Settings.LastModel = Nvidia.DefaultModel;
-            if (convo.Model == model) convo.Model = Nvidia.DefaultModel;
-            Store.SaveSettings();
-            convo.Save();
+            // modele supprime du catalogue : on le bannit definitivement et on bascule
+            SavePartial(convo, model, roundContent, roundReason, sw.ElapsedMilliseconds);
+            MarkModelDead(model);
+            PushMessages();
             RunJs($"window.api.setModels({J(ModelList())}, {J(CurrentModel())})");
             RunJs("window.api.cancelStream()");
             RunJs($"window.api.showError({J(Loc.S("err404"))}, true)");
+            _ = RefreshModelsAsync(force: true);   // recupere la liste a jour tout de suite
         }
         catch (Exception ex)
         {

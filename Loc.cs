@@ -79,6 +79,33 @@ internal static class Loc
             ["fr"] = "(réponse vide)", ["en"] = "(empty reply)", ["es"] = "(respuesta vacía)",
             ["de"] = "(leere Antwort)", ["it"] = "(risposta vuota)", ["pt"] = "(resposta vazia)",
         },
+        ["modelsRefreshed"] = new()
+        {
+            ["fr"] = "Liste des modèles actualisée ({0} modèles)",
+            ["en"] = "Model list updated ({0} models)",
+            ["es"] = "Lista de modelos actualizada ({0} modelos)",
+            ["de"] = "Modellliste aktualisiert ({0} Modelle)",
+            ["it"] = "Elenco dei modelli aggiornato ({0} modelli)",
+            ["pt"] = "Lista de modelos atualizada ({0} modelos)",
+        },
+        ["modelsRefreshFailed"] = new()
+        {
+            ["fr"] = "Impossible d'actualiser la liste des modèles (réseau ou clé API).",
+            ["en"] = "Could not refresh the model list (network or API key).",
+            ["es"] = "No se pudo actualizar la lista de modelos (red o clave API).",
+            ["de"] = "Modellliste konnte nicht aktualisiert werden (Netzwerk oder API-Schlüssel).",
+            ["it"] = "Impossibile aggiornare l'elenco dei modelli (rete o chiave API).",
+            ["pt"] = "Não foi possível atualizar a lista de modelos (rede ou chave de API).",
+        },
+        ["modelsNoKey"] = new()
+        {
+            ["fr"] = "Ajoutez votre clé API pour actualiser la liste des modèles.",
+            ["en"] = "Add your API key to refresh the model list.",
+            ["es"] = "Añade tu clave API para actualizar la lista de modelos.",
+            ["de"] = "Füge deinen API-Schlüssel hinzu, um die Modellliste zu aktualisieren.",
+            ["it"] = "Aggiungi la chiave API per aggiornare l'elenco dei modelli.",
+            ["pt"] = "Adicione sua chave de API para atualizar a lista de modelos.",
+        },
         ["listen"] = new()
         {
             ["fr"] = "Écoute…", ["en"] = "Listening…", ["es"] = "Escuchando…",
