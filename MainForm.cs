@@ -393,6 +393,7 @@ class MainForm : Form
         PushMessages();
         PushStatus();
         PushKeyMissing();
+        PushUpdateState("idle");
         RunJs("window.api.setBusy(false)");
     }
 
@@ -582,7 +583,7 @@ class MainForm : Form
             var path = await UpdateService.DownloadAsync(info, new Progress<double>(p =>
                 RunJs($"window.api.setUpdateProgress({p.ToString("0", System.Globalization.CultureInfo.InvariantCulture)})")));
             PushUpdateState("ready");
-            UpdateService.ApplyAndRestart(path);
+            UpdateService.ApplyAndRestart(path, info.Sha256);
             Close();   // le script attend la fermeture, remplace l'exe et relance
         }
         catch (Exception ex)

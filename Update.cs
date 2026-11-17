@@ -240,7 +240,7 @@ public static class UpdateService
     /// Lance un petit script PowerShell qui attend la fermeture de l'app,
     /// remplace l'exe par la nouvelle version verifiee puis la redemarre.
     /// </summary>
-    public static void ApplyAndRestart(string newExe)
+    public static void ApplyAndRestart(string newExe, string? expectedSha256 = null)
     {
         var target = Environment.ProcessPath;
         if (string.IsNullOrEmpty(target) || !CanSelfUpdate)
@@ -248,6 +248,11 @@ public static class UpdateService
         var dir = Path.GetDirectoryName(target);
         if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
             throw new InvalidOperationException("Dossier de l'application introuvable.");
+
+        // le fichier telecharge n'a pas pu changer depuis la verification de l'empreinte
+        if (!string.IsNullOrEmpty(expectedSha256) &&
+            !string.Equals(Sha256Of(newExe), expectedSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Le fichier telecharge ne correspond plus a l'empreinte attendue.");
 
         var log = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -267,6 +272,7 @@ public static class UpdateService
         sb.AppendLine("$dst = " + Q(target));
         sb.AppendLine("$app = " + Environment.ProcessId);
         sb.AppendLine("$dir = " + Q(dir));
+        sb.AppendLine("$sha = " + Q(expectedSha256 ?? ""));
         // on attend la disparition de notre propre process (ou de tout hote 'dotnet' pendant le developpement)
         sb.AppendLine("while ($true) {");
         sb.AppendLine("  $alive = $false");
@@ -280,10 +286,12 @@ public static class UpdateService
         sb.AppendLine("  } catch { }");
         sb.AppendLine("  if ($mine) { Start-Sleep -Milliseconds 400; continue }");
         sb.AppendLine("  $ok = $false");
+        sb.AppendLine("  $want = $sha");
+        sb.AppendLine("  if ($want -eq '') { $want = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash.ToLower() }");
         sb.AppendLine("  for ($i = 0; $i -lt 120; $i++) {");
         sb.AppendLine("    try {");
         sb.AppendLine("      Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop");
-        sb.AppendLine("      if ((Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash) { $ok = $true; break }");
+        sb.AppendLine("      if ((Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash.ToLower() -eq $want) { $ok = $true; break }");
         sb.AppendLine("    } catch { }");
         sb.AppendLine("    Start-Sleep -Milliseconds 1000");
         sb.AppendLine("  }");
