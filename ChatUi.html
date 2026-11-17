@@ -1687,6 +1687,7 @@ window.api = {
   },
   openLangPicker: function(){ closeAllOverlays(); document.getElementById('lang-modal').hidden = false; },
   refreshModels: function(force){ if (!state.busy){ const b = document.getElementById('picker-refresh'); if (b && force) b.classList.add('spinning'); } post('refreshModels', {force: !!force}); },
+  modelsRefreshDone: function(){ const b = document.getElementById('picker-refresh'); if (b) b.classList.remove('spinning'); },
   checkUpdate: function(){ post('checkUpdate'); },
   installUpdate: function(){ post('installUpdate'); },
   skipUpdate: function(){ post('skipUpdate'); },

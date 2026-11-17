@@ -441,10 +441,14 @@ class MainForm : Form
     {
         if (string.IsNullOrWhiteSpace(Store.Settings.ApiKey))
         {
-            if (notify) RunJs($"window.api.setStatus({J(Loc.S("modelsNoKey"))})");
+            if (notify)
+            {
+                RunJs($"window.api.setStatus({J(Loc.S("modelsNoKey"))})");
+                RunJs("window.api.modelsRefreshDone()");
+            }
             return;
         }
-        if (!await _modelGate.WaitAsync(0)) return;   // deja en cours
+        if (!await _modelGate.WaitAsync(0)) { if (notify) RunJs("window.api.modelsRefreshDone()"); return; }   // deja en cours
         try
         {
             var fetchedAt = Store.Settings.ModelsFetchedAt;
@@ -493,7 +497,7 @@ class MainForm : Form
         {
             if (notify) RunJs($"window.api.setStatus({J(Loc.S("modelsRefreshFailed"))})");
         }
-        finally { _modelGate.Release(); }
+        finally { _modelGate.Release(); if (notify) RunJs("window.api.modelsRefreshDone()"); }
     }
 
     // ---------------------------------------------------------------- mise a jour
@@ -545,7 +549,7 @@ class MainForm : Form
             url = _update?.Url,
             notes = _update?.Notes,
             current = UpdateService.CurrentText,
-            canAuto = _update?.AssetUrl != null && UpdateService.CanSelfUpdate,
+            canAuto = _update?.AssetUrl != null && !string.IsNullOrEmpty(_update.Sha256) && UpdateService.CanSelfUpdate,
             detail
         })})");
     }
@@ -569,7 +573,7 @@ class MainForm : Form
         }
 
         // pas de remplacement automatique possible : on ouvre la page de la release
-        if (info.AssetUrl == null || !UpdateService.CanSelfUpdate)
+        if (info.AssetUrl == null || string.IsNullOrEmpty(info.Sha256) || !UpdateService.CanSelfUpdate)
         {
             OpenExternal(info.Url);
             PushUpdateState("manual");

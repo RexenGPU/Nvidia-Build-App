@@ -22,6 +22,8 @@ public static class UpdateService
     const long MaxAssetSize = 300L * 1024 * 1024;
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
+    // le binaire fait ~53 Mo : un delai court ferait echouer les connexions lentes
+    static readonly HttpClient DownloadHttp = new() { Timeout = TimeSpan.FromMinutes(15) };
 
     public static Version CurrentVersion =>
         typeof(UpdateService).Assembly.GetName().Version ?? new Version(1, 0);
@@ -194,22 +196,22 @@ public static class UpdateService
         var tmp = dest + ".part";
         try
         {
-            using (var resp = await Http.GetAsync(info.AssetUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+            using (var resp = await DownloadHttp.GetAsync(info.AssetUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
             {
                 resp.EnsureSuccessStatusCode();
                 // GitHub redirige vers son CDN : on n'accepte que github.com / *.githubusercontent.com
                 if (!IsTrustedFinalUri(resp.RequestMessage?.RequestUri))
                     throw new InvalidOperationException("Redirection de telechargement refusee.");
                 var total = resp.Content.Headers.ContentLength ?? -1;
-                await using var src = await resp.Content.ReadAsStreamAsync(ct);
+                await using var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 await using var dst = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None,
                     81920, useAsync: true);
                 var buf = new byte[81920];
                 long done = 0;
                 int n;
-                while ((n = await src.ReadAsync(buf, ct)) > 0)
+                while ((n = await src.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
                 {
-                    await dst.WriteAsync(buf.AsMemory(0, n), ct);
+                    await dst.WriteAsync(buf.AsMemory(0, n), ct).ConfigureAwait(false);
                     done += n;
                     if (total > 0) progress?.Report(Math.Clamp(done * 100.0 / total, 0, 100));
                 }
